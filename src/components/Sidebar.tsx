@@ -6,8 +6,8 @@ import { LayoutDashboard, Coins, Gem, Activity, Zap } from 'lucide-react';
 
 const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [
   { view: 'portfolio', label: 'Portfolio', icon: <LayoutDashboard size={20} /> },
-  { view: 'udt', label: 'UDT Assets', icon: <Coins size={20} /> },
-  { view: 'spore', label: 'Spore NFTs', icon: <Gem size={20} /> },
+  { view: 'udt', label: 'UDT', icon: <Coins size={20} /> },
+  { view: 'spore', label: 'DOBs', icon: <Gem size={20} /> },
   { view: 'transactions', label: 'Transactions', icon: <Activity size={20} /> },
 ];
 

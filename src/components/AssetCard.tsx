@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { UdtAsset, SporeAsset } from '../services/types';
 import { formatAmount, formatAddress } from '../utils/format';
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Gem } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Gem, FlaskConical, Copy, Check } from 'lucide-react';
 
 interface UdtCardProps {
   asset: UdtAsset;
@@ -24,13 +24,76 @@ const locationBadge = (location: 'ckb' | 'btc') => (
       fontWeight: 600,
       textTransform: 'uppercase',
       letterSpacing: '0.5px',
-      background: location === 'btc' ? 'rgba(255, 164, 43, 0.15)' : 'rgba(83, 157, 245, 0.15)',
-      color: location === 'btc' ? 'var(--text-warning)' : 'var(--text-announcement)',
+      background: location === 'btc' ? 'rgba(30, 215, 96, 0.12)' : 'rgba(83, 157, 245, 0.15)',
+      color: location === 'btc' ? 'var(--green)' : 'var(--text-announcement)',
     }}
   >
-    {location.toUpperCase()}
+    {location === 'btc' ? 'RGB++' : 'CKB'}
   </span>
 );
+
+const mockBadge = () => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '3px',
+      padding: '2px 7px',
+      borderRadius: '4px',
+      fontSize: '0.5625rem',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.8px',
+      background: 'rgba(255, 255, 255, 0.06)',
+      color: 'var(--text-muted)',
+      border: '1px dashed rgba(255, 255, 255, 0.1)',
+    }}
+  >
+    <FlaskConical size={9} />
+    Mock
+  </span>
+);
+
+function CopyableHash({ text, display }: { text: string; display: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <span
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : `Copy ${text}`}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: '0.6875rem',
+        color: 'var(--text-muted)',
+        fontFamily: 'monospace',
+        cursor: 'pointer',
+        borderRadius: '4px',
+        padding: '2px 4px',
+        margin: '-2px -4px',
+        transition: 'all 150ms ease',
+        background: copied ? 'rgba(30, 215, 96, 0.1)' : 'transparent',
+      }}
+      onMouseEnter={(e) => { if (!copied) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+      onMouseLeave={(e) => { if (!copied) e.currentTarget.style.background = 'transparent'; }}
+    >
+      {display}
+      {copied
+        ? <Check size={10} color="var(--green)" style={{ flexShrink: 0 }} />
+        : <Copy size={10} style={{ flexShrink: 0, opacity: 0.5 }} />
+      }
+    </span>
+  );
+}
 
 const actionButton = (
   label: string,
@@ -110,9 +173,10 @@ export function UdtCard({ asset, onAction }: UdtCardProps) {
           <Coins size={20} color="#000" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, fontSize: '1rem' }}>{asset.symbol}</span>
             {locationBadge(asset.location)}
+            {asset.isMock && mockBadge()}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{asset.name}</div>
         </div>
@@ -122,9 +186,6 @@ export function UdtCard({ asset, onAction }: UdtCardProps) {
       <div style={{ marginBottom: '16px' }}>
         <div style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
           {formatAmount(asset.balance, asset.decimals)}
-        </div>
-        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '4px' }}>
-          {formatAddress(asset.typeScriptArgs, 10, 8)}
         </div>
       </div>
 
@@ -175,13 +236,8 @@ export function SporeCard({ asset, onAction }: SporeCardProps) {
         }}
       >
         <Gem size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
-        <div
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-          }}
-        >
+        <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+          {asset.isMock && mockBadge()}
           {locationBadge(asset.location)}
         </div>
       </div>
@@ -189,7 +245,7 @@ export function SporeCard({ asset, onAction }: SporeCardProps) {
       {/* Info */}
       <div style={{ marginBottom: '12px' }}>
         <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '2px' }}>
-          {asset.clusterName || 'Spore'}
+          {asset.clusterName || 'DOB'}
         </div>
         <div
           style={{

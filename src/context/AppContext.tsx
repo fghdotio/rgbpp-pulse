@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { ccc } from '@ckb-ccc/connector-react';
 import type { AppView } from '../services/types';
 
 interface Notification {
@@ -14,10 +15,14 @@ interface AppContextValue {
   currentView: AppView;
   setView: (view: AppView) => void;
 
-  /** Wallet state (simplified — real CCC connector handles the heavy lifting) */
-  walletAddress: string | null;
+  /** CCC Wallet state */
+  signer: ccc.Signer | undefined;
+  client: ccc.Client;
+  wallet: ccc.Wallet | undefined;
   isConnected: boolean;
-  connect: () => void;
+  walletAddress: string | null;
+  btcAddress: string | null;
+  openConnector: () => void;
   disconnect: () => void;
 
   /** Notifications */
@@ -30,27 +35,59 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentView, setView] = useState<AppView>('portfolio');
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [btcAddress, setBtcAddress] = useState<string | null>(null);
 
-  const isConnected = walletAddress !== null;
+  // CCC hooks
+  const {
+    wallet,
+    signerInfo,
+    open: openConnector,
+    client,
+    disconnect: cccDisconnect,
+  } = ccc.useCcc();
 
-  const connect = useCallback(() => {
-    // Demo: simulate wallet connection
-    setWalletAddress('ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq');
-  }, []);
+  const signer = signerInfo?.signer;
+  const isConnected = !!signer;
+
+  // Resolve addresses when signer changes
+  useEffect(() => {
+    if (!signer) {
+      setWalletAddress(null);
+      setBtcAddress(null);
+      return;
+    }
+
+    // CKB address via recommended address (full ckb format)
+    signer.getRecommendedAddress().then((addr) => {
+      setWalletAddress(addr);
+    }).catch(() => {
+      // Fallback to internal address
+      signer.getInternalAddress().then((addr) => {
+        setWalletAddress(addr);
+      }).catch(() => {});
+    });
+
+    // BTC address via internal address (only if BTC-like)
+    signer.getInternalAddress().then((addr) => {
+      if (addr.startsWith('tb1') || addr.startsWith('bc1') || addr.startsWith('1') || addr.startsWith('3') || addr.startsWith('m') || addr.startsWith('n') || addr.startsWith('2')) {
+        setBtcAddress(addr);
+      }
+    }).catch(() => {});
+  }, [signer]);
 
   const disconnect = useCallback(() => {
+    cccDisconnect();
     setWalletAddress(null);
+    setBtcAddress(null);
     setView('portfolio');
-  }, []);
+  }, [cccDisconnect]);
 
   const notify = useCallback(
     (level: 'info' | 'warn' | 'error', title: string, message: string) => {
       const id = Math.random().toString(36).substring(2, 10);
       setNotifications((prev) => [{ id, level, title, message, timestamp: Date.now() }, ...prev].slice(0, 10));
-
-      // Auto-dismiss after 6 seconds
       setTimeout(() => {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
       }, 6000);
@@ -67,9 +104,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         currentView,
         setView,
-        walletAddress,
+        signer,
+        client,
+        wallet,
         isConnected,
-        connect,
+        walletAddress,
+        btcAddress,
+        openConnector,
         disconnect,
         notifications,
         notify,

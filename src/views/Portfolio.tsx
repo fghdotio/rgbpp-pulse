@@ -1,44 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTransactions } from '../context/TransactionContext';
 import { UdtCard, SporeCard } from '../components/AssetCard';
 import { ActionModal } from '../components/ActionModal';
-import { TransactionTracker } from '../components/TransactionTracker';
-import { getMockUdtAssets, getMockSporeAssets } from '../services/assets';
+import { showToast } from '../components/Toast';
+import { fetchUdtAssets, fetchSporeAssets, getMockUdtAssets, getMockSporeAssets } from '../services/assets';
 import { udtLeapToBtc, udtTransferOnBtc, udtLeapToCkb, sporeLeapToBtc, sporeTransferOnBtc, sporeLeapToCkb } from '../services/rgbpp';
 import type { RgbppOperation, UdtAsset, SporeAsset } from '../services/types';
-import { Wallet, Coins, Gem } from 'lucide-react';
+import { Wallet, Coins, Gem, Loader2, Box, Zap } from 'lucide-react';
 
 export function Portfolio() {
-  const { isConnected, walletAddress } = useApp();
+  const { isConnected, walletAddress, btcAddress, signer, client, setView, openConnector } = useApp();
   const { activePipelines, upsertPipeline } = useTransactions();
-  const [modal, setModal] = useState<{ type: 'udt' | 'spore'; op: RgbppOperation; name: string; args: string } | null>(null);
+  const [modal, setModal] = useState<{ type: 'udt' | 'spore'; op: RgbppOperation; name: string; args: string; udtAsset?: UdtAsset } | null>(null);
+  const [udtAssets, setUdtAssets] = useState<UdtAsset[]>([]);
+  const [sporeAssets, setSporeAssets] = useState<SporeAsset[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const udtAssets = getMockUdtAssets();
-  const sporeAssets = getMockSporeAssets();
+  // Fetch real assets when connected
+  useEffect(() => {
+    if (!isConnected) {
+      setUdtAssets([]);
+      setSporeAssets([]);
+      return;
+    }
+
+    setLoading(true);
+
+    const loadAssets = async () => {
+      try {
+        const [udts, spores] = await Promise.all([
+          fetchUdtAssets(btcAddress, client, signer),
+          btcAddress ? fetchSporeAssets(btcAddress) : Promise.resolve(getMockSporeAssets()),
+        ]);
+        setUdtAssets(udts);
+        setSporeAssets(spores);
+      } catch {
+        setUdtAssets(getMockUdtAssets());
+        setSporeAssets(getMockSporeAssets());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAssets();
+  }, [isConnected, btcAddress, signer, client]);
+
+  // Group assets by chain location
+  const ckbUdts = udtAssets.filter((a) => a.location === 'ckb');
+  const ckbSpores = sporeAssets.filter((a) => a.location === 'ckb');
+  const rgbppUdts = udtAssets.filter((a) => a.location === 'btc');
+  const rgbppSpores = sporeAssets.filter((a) => a.location === 'btc');
+  const hasCkbAssets = ckbUdts.length > 0 || ckbSpores.length > 0;
+  const hasRgbppAssets = rgbppUdts.length > 0 || rgbppSpores.length > 0;
 
   const handleUdtAction = (asset: UdtAsset, op: RgbppOperation) => {
-    setModal({ type: 'udt', op, name: asset.symbol, args: asset.typeScriptArgs });
+    setModal({ type: 'udt', op, name: asset.symbol, args: asset.typeScriptArgs, udtAsset: asset });
   };
 
   const handleSporeAction = (asset: SporeAsset, op: RgbppOperation) => {
-    setModal({ type: 'spore', op, name: asset.clusterName || 'Spore', args: asset.id });
+    setModal({ type: 'spore', op, name: asset.clusterName || 'DOB', args: asset.id });
   };
 
   const handleSubmit = async (params: { address: string; amount: string }) => {
     if (!modal) return;
+    const opLabel = modal.op === 'leap-to-btc' ? 'Leap to BTC' : modal.op === 'transfer-on-btc' ? 'Transfer on BTC' : 'Leap to CKB';
     const onUpdate = upsertPipeline;
 
     if (modal.type === 'udt') {
       const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
-      if (modal.op === 'leap-to-btc') await udtLeapToBtc({ udtScriptArgs: modal.args, amount: amt }, onUpdate);
-      if (modal.op === 'transfer-on-btc') await udtTransferOnBtc({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
-      if (modal.op === 'leap-to-ckb') await udtLeapToCkb({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
+      if (modal.op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: modal.args, amount: amt }, onUpdate);
+      if (modal.op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
+      if (modal.op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
     } else {
-      if (modal.op === 'leap-to-btc') await sporeLeapToBtc({ sporeTypeArgs: modal.args }, onUpdate);
-      if (modal.op === 'transfer-on-btc') await sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: modal.args }] }, onUpdate);
-      if (modal.op === 'leap-to-ckb') await sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: modal.args }, onUpdate);
+      if (modal.op === 'leap-to-btc') sporeLeapToBtc({ sporeTypeArgs: modal.args }, onUpdate);
+      if (modal.op === 'transfer-on-btc') sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: modal.args }] }, onUpdate);
+      if (modal.op === 'leap-to-ckb') sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: modal.args }, onUpdate);
     }
+
+    // Show toast with "View" action — no auto-navigation
+    showToast(`${opLabel} submitted · ${modal.name}`, {
+      label: 'View',
+      onClick: () => setView('transactions'),
+    });
   };
 
   if (!isConnected) {
@@ -51,46 +95,116 @@ export function Portfolio() {
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', textAlign: 'center', maxWidth: '320px' }}>
           Connect a CKB or BTC wallet to view and manage your RGB++ assets
         </p>
+        <button
+          onClick={openConnector}
+          style={{
+            marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '8px',
+            background: 'var(--green)', color: '#000', padding: '12px 32px',
+            borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: '0.875rem',
+            border: 'none', cursor: 'pointer', transition: 'all 150ms ease',
+          }}
+        >
+          <Wallet size={16} />
+          Connect Wallet
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px', color: 'var(--text-secondary)' }}>
+        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+        Loading assets...
       </div>
     );
   }
 
   return (
     <div style={{ animation: 'fadeIn 300ms ease' }}>
-      {/* Active Pipelines */}
-      {activePipelines.length > 0 && (
-        <section style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.4px', marginBottom: '12px' }}>
-            Active Transactions
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {activePipelines.map((p) => <TransactionTracker key={p.id} pipeline={p} compact />)}
-          </div>
-        </section>
-      )}
 
-      {/* UDT Assets */}
-      <section style={{ marginBottom: '32px' }}>
+      {/* ── RGB++ Assets ─────────────────────────────── */}
+      <section style={{ marginBottom: '36px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <Coins size={18} color="var(--green)" />
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>UDT</h2>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{udtAssets.length} assets</span>
+          <Zap size={18} color="var(--green)" />
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>RGB++</h2>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {rgbppUdts.length + rgbppSpores.length} assets
+          </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-          {udtAssets.map((a) => <UdtCard key={a.typeScriptArgs} asset={a} onAction={(op) => handleUdtAction(a, op)} />)}
-        </div>
+
+        {hasRgbppAssets ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* RGB++ UDTs */}
+            {rgbppUdts.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                  UDT
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                  {rgbppUdts.map((a) => <UdtCard key={a.typeScriptArgs} asset={a} onAction={(op) => handleUdtAction(a, op)} />)}
+                </div>
+              </div>
+            )}
+            {/* RGB++ DOBs */}
+            {rgbppSpores.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                  DOBs
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                  {rgbppSpores.map((a) => <SporeCard key={a.id} asset={a} onAction={(op) => handleSporeAction(a, op)} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            No RGB++ assets found
+          </div>
+        )}
       </section>
 
-      {/* Spore Assets */}
+      {/* ── CKB Assets ───────────────────────────────── */}
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <Gem size={18} color="var(--green)" />
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>DOBs</h2>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{sporeAssets.length} items</span>
+          <Box size={18} color="var(--text-announcement)" />
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>CKB</h2>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {ckbUdts.length + ckbSpores.length} assets
+          </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
-          {sporeAssets.map((a) => <SporeCard key={a.id} asset={a} onAction={(op) => handleSporeAction(a, op)} />)}
-        </div>
+
+        {hasCkbAssets ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* CKB UDTs */}
+            {ckbUdts.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                  UDT
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                  {ckbUdts.map((a) => <UdtCard key={a.typeScriptArgs} asset={a} onAction={(op) => handleUdtAction(a, op)} />)}
+                </div>
+              </div>
+            )}
+            {/* CKB DOBs */}
+            {ckbSpores.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                  DOBs
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                  {ckbSpores.map((a) => <SporeCard key={a.id} asset={a} onAction={(op) => handleSporeAction(a, op)} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            No CKB assets found
+          </div>
+        )}
       </section>
 
       {/* Modal */}
@@ -101,6 +215,9 @@ export function Portfolio() {
           assetType={modal.type}
           operation={modal.op}
           assetName={modal.name}
+          udtInfo={modal.udtAsset}
+          ckbAddress={walletAddress}
+          btcAddress={btcAddress}
           onSubmit={handleSubmit}
         />
       )}

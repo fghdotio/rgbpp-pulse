@@ -40,7 +40,7 @@ export function formatTimestamp(ts: number): string {
 }
 
 /**
- * Get CKB explorer URL.
+ * Get CKB explorer URL for a transaction.
  */
 export function getCkbExplorerUrl(txHash: string, isTestnet = true): string {
   const base = isTestnet
@@ -50,13 +50,33 @@ export function getCkbExplorerUrl(txHash: string, isTestnet = true): string {
 }
 
 /**
- * Get BTC explorer URL.
+ * Get CKB explorer URL for an address.
+ */
+export function getCkbAddressExplorerUrl(address: string, isTestnet = true): string {
+  const base = isTestnet
+    ? 'https://testnet.explorer.nervos.org'
+    : 'https://explorer.nervos.org';
+  return `${base}/address/${address}`;
+}
+
+/**
+ * Get BTC explorer URL for a transaction.
  */
 export function getBtcExplorerUrl(txId: string, isTestnet = true): string {
   const base = isTestnet
     ? 'https://mempool.space/testnet'
     : 'https://mempool.space';
   return `${base}/tx/${txId}`;
+}
+
+/**
+ * Get BTC explorer URL for an address.
+ */
+export function getBtcAddressExplorerUrl(address: string, isTestnet = true): string {
+  const base = isTestnet
+    ? 'https://mempool.space/testnet'
+    : 'https://mempool.space';
+  return `${base}/address/${address}`;
 }
 
 /**

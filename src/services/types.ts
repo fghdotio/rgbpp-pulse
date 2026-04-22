@@ -22,6 +22,7 @@ export interface UdtAsset {
   typeScriptCodeHash: string;
   typeScriptHashType: string;
   location: AssetLocation;
+  isMock?: boolean;
 }
 
 /** Spore asset representation */
@@ -33,6 +34,7 @@ export interface SporeAsset {
   clusterId?: string;
   clusterName?: string;
   location: AssetLocation;
+  isMock?: boolean;
 }
 
 /** Union type for all RGB++ assets */

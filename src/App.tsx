@@ -2,9 +2,10 @@ import React from 'react';
 import { Sidebar } from './components/Sidebar';
 import { WalletConnect } from './components/WalletConnect';
 import { Notifications } from './components/Notifications';
+import { ToastContainer } from './components/Toast';
 import { Portfolio } from './views/Portfolio';
 import { UdtManager } from './views/UdtManager';
-import { SporeManager } from './views/SporeManager';
+import { DobsManager } from './views/DobsManager';
 import { Transactions } from './views/Transactions';
 import { useApp } from './context/AppContext';
 
@@ -14,7 +15,7 @@ function ViewRouter() {
   switch (currentView) {
     case 'portfolio': return <Portfolio />;
     case 'udt': return <UdtManager />;
-    case 'spore': return <SporeManager />;
+    case 'spore': return <DobsManager />;
     case 'transactions': return <Transactions />;
     default: return <Portfolio />;
   }
@@ -50,6 +51,7 @@ export default function App() {
       </div>
 
       <Notifications />
+      <ToastContainer />
     </div>
   );
 }
