@@ -8,6 +8,7 @@ import { UdtManager } from './views/UdtManager';
 import { DobsManager } from './views/DobsManager';
 import { Transactions } from './views/Transactions';
 import { useApp } from './context/AppContext';
+import { useTransactionRecovery } from './hooks/useTransactionRecovery';
 
 function ViewRouter() {
   const { currentView } = useApp();
@@ -22,6 +23,9 @@ function ViewRouter() {
 }
 
 export default function App() {
+  // Resume any interrupted CKB confirmations on page load
+  useTransactionRecovery();
+
   return (
     <div style={{ display: 'flex', width: '100%', minHeight: '100vh' }}>
       <Sidebar />

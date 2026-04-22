@@ -77,6 +77,10 @@ export interface RgbppBtcReceiver {
 export interface UdtLeapToBtcParams {
   udtScriptArgs: string;
   amount: bigint;
+  /** The CCC signer (must be a BTC signer for leap-to-btc) */
+  signer?: import('@ckb-ccc/core').ccc.Signer;
+  /** The CKB client instance */
+  client?: import('@ckb-ccc/core').ccc.Client;
 }
 
 export interface UdtTransferOnBtcParams {

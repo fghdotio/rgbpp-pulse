@@ -1,5 +1,32 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { TransactionPipeline } from '../services/types';
+
+const STORAGE_KEY = 'rgbpp_transaction_pipelines';
+
+/**
+ * Serialize pipelines to localStorage.
+ * BigInt values are not expected in TransactionPipeline so JSON.stringify is safe.
+ */
+function savePipelines(pipelines: TransactionPipeline[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pipelines));
+  } catch {
+    // localStorage might be full or disabled — silently ignore
+  }
+}
+
+/**
+ * Load pipelines from localStorage.
+ */
+function loadPipelines(): TransactionPipeline[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as TransactionPipeline[];
+  } catch {
+    return [];
+  }
+}
 
 interface TransactionContextValue {
   /** Active + historical pipelines */
@@ -17,7 +44,12 @@ interface TransactionContextValue {
 const TransactionContext = createContext<TransactionContextValue | undefined>(undefined);
 
 export function TransactionProvider({ children }: { children: ReactNode }) {
-  const [pipelines, setPipelines] = useState<TransactionPipeline[]>([]);
+  const [pipelines, setPipelines] = useState<TransactionPipeline[]>(() => loadPipelines());
+
+  // Persist to localStorage whenever pipelines change
+  useEffect(() => {
+    savePipelines(pipelines);
+  }, [pipelines]);
 
   const upsertPipeline = useCallback((pipeline: TransactionPipeline) => {
     setPipelines((prev) => {

@@ -39,7 +39,7 @@ export function UdtManager() {
     const { op, asset } = modal;
     const opLabel = op === 'leap-to-btc' ? 'Leap to BTC' : op === 'transfer-on-btc' ? 'Transfer on BTC' : 'Leap to CKB';
     const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
-    if (op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: asset.typeScriptArgs, amount: amt }, upsertPipeline);
+    if (op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: asset.typeScriptArgs, amount: amt, signer: signer ?? undefined, client: client ?? undefined }, upsertPipeline);
     if (op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: asset.typeScriptArgs, receivers: [{ address: params.address, amount: amt }] }, upsertPipeline);
     if (op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: asset.typeScriptArgs, receivers: [{ address: params.address, amount: amt }] }, upsertPipeline);
 

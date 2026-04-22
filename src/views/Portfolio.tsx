@@ -31,13 +31,13 @@ export function Portfolio() {
       try {
         const [udts, spores] = await Promise.all([
           fetchUdtAssets(btcAddress, client, signer),
-          btcAddress ? fetchSporeAssets(btcAddress) : Promise.resolve(getMockSporeAssets()),
+          btcAddress ? fetchSporeAssets(btcAddress) : Promise.resolve([]),
         ]);
         setUdtAssets(udts);
         setSporeAssets(spores);
       } catch {
         setUdtAssets(getMockUdtAssets());
-        setSporeAssets(getMockSporeAssets());
+        setSporeAssets([]);
       } finally {
         setLoading(false);
       }
@@ -69,7 +69,7 @@ export function Portfolio() {
 
     if (modal.type === 'udt') {
       const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
-      if (modal.op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: modal.args, amount: amt }, onUpdate);
+      if (modal.op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: modal.args, amount: amt, signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
       if (modal.op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
       if (modal.op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
     } else {

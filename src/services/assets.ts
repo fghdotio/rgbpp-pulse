@@ -240,10 +240,10 @@ export async function fetchSporeAssets(btcAddress: string): Promise<SporeAsset[]
       });
     }
 
-    return spores.length > 0 ? spores : getMockSporeAssets();
+    return spores;
   } catch (err) {
-    console.warn('Failed to fetch Spore assets from API, using mock data:', err);
-    return getMockSporeAssets();
+    console.warn('Failed to fetch Spore assets from API:', err);
+    return [];
   }
 }
 

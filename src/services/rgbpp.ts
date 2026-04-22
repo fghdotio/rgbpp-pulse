@@ -6,6 +6,8 @@
  *
  * Each operation returns a TransactionPipeline for real-time tracking.
  */
+import { ccc } from '@ckb-ccc/core';
+import { Udt } from '@ckb-ccc/udt';
 import type {
   TransactionPipeline,
   TransactionStep,
@@ -18,6 +20,7 @@ import type {
   RgbppOperation,
 } from './types';
 import { generateId } from '../utils/format';
+import { createRgbppClient, createBrowserBtcWallet, isBtcSigner } from './rgbppSetup';
 
 /**
  * Create a fresh pipeline with the given steps.
@@ -44,8 +47,58 @@ function createPipeline(
 }
 
 /**
+ * Helper: advance a pipeline step to 'active'.
+ */
+function activateStep(pipeline: TransactionPipeline, index: number, onUpdate: (p: TransactionPipeline) => void) {
+  const steps = [...pipeline.steps];
+  steps[index] = { ...steps[index], status: 'active', timestamp: Date.now() };
+  pipeline = { ...pipeline, steps };
+  onUpdate(pipeline);
+  return pipeline;
+}
+
+/**
+ * Helper: mark a pipeline step as 'done' with an optional txHash.
+ */
+function completeStep(
+  pipeline: TransactionPipeline,
+  index: number,
+  onUpdate: (p: TransactionPipeline) => void,
+  opts?: { txHash?: string; chain?: 'ckb' | 'btc'; detail?: string },
+) {
+  const steps = [...pipeline.steps];
+  steps[index] = {
+    ...steps[index],
+    status: 'done',
+    timestamp: Date.now(),
+    ...(opts?.txHash && { txHash: opts.txHash }),
+    ...(opts?.chain && { chain: opts.chain }),
+    ...(opts?.detail && { detail: opts.detail }),
+  };
+  pipeline = { ...pipeline, steps };
+  onUpdate(pipeline);
+  return pipeline;
+}
+
+/**
+ * Helper: mark a pipeline step as 'error'.
+ */
+function failStep(
+  pipeline: TransactionPipeline,
+  index: number,
+  error: string,
+  onUpdate: (p: TransactionPipeline) => void,
+) {
+  const steps = [...pipeline.steps];
+  steps[index] = { ...steps[index], status: 'error', error, timestamp: Date.now() };
+  pipeline = { ...pipeline, steps, status: 'error' };
+  onUpdate(pipeline);
+  return pipeline;
+}
+
+/**
  * Simulate progressing through pipeline steps with delays.
- * In production, each step would invoke real SDK calls.
+ * Used as fallback when signer/client are not provided.
  */
 async function simulatePipeline(
   pipeline: TransactionPipeline,
@@ -91,23 +144,27 @@ async function simulatePipeline(
 // ─── UDT Operations ─────────────────────────────────────────
 
 /**
- * UDT: Leap from CKB to BTC
+ * UDT: Leap from CKB to BTC (REAL IMPLEMENTATION)
  *
- * Real flow (from udt-leap-to-btc.ts):
- * 1. rgbppBtcWallet.prepareUtxoSeal()
- * 2. Build rgbppLock via rgbppUdtClient.buildRgbppLockScript(utxoSeal)
- * 3. udt.transfer(ckbSigner, [{ to: rgbppLock, amount }])
- * 4. udt.completeBy(tx, ckbSigner)
- * 5. tx.completeFeeBy(ckbSigner)
- * 6. ckbSigner.signTransaction(tx)
- * 7. ckbSigner.client.sendTransaction(signedTx)
+ * Flow:
+ * 1. rgbppBtcWallet.prepareUtxoSeal()     — create BTC UTXO to bind to
+ * 2. rgbppUdtClient.buildRgbppLockScript() — build RGB++ lock
+ * 3. udt.transfer(signer, [...])           — compose CKB tx
+ * 4. udt.completeBy(tx, signer)            — complete UDT inputs
+ * 5. tx.completeFeeBy(signer)              — add CKB fee
+ * 6. signer.signTransaction(tx)            — sign
+ * 7. client.sendTransaction(signedTx)      — broadcast
+ *
+ * Falls back to simulation if signer/client are not provided.
  */
 export async function udtLeapToBtc(
-  _params: UdtLeapToBtcParams,
+  params: UdtLeapToBtcParams,
   onUpdate: (p: TransactionPipeline) => void,
 ): Promise<TransactionPipeline> {
-  const pipeline = createPipeline('leap-to-btc', 'udt', 'UDT', [
-    'Preparing UTXO Seal',
+  const { udtScriptArgs, amount, signer, client } = params;
+
+  let pipeline = createPipeline('leap-to-btc', 'udt', 'UDT', [
+    'Creating BTC UTXO Seal',
     'Building RGB++ Lock',
     'Composing CKB Transaction',
     'Signing CKB Transaction',
@@ -115,7 +172,91 @@ export async function udtLeapToBtc(
     'Waiting for CKB Confirmation',
   ]);
   onUpdate(pipeline);
-  return simulatePipeline(pipeline, onUpdate);
+
+  // Fallback to simulation if no signer/client
+  if (!signer || !client) {
+    console.warn('[udtLeapToBtc] No signer/client provided, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  // Verify the signer is a BTC signer
+  if (!isBtcSigner(signer)) {
+    console.warn('[udtLeapToBtc] Signer is not a BTC signer, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  try {
+    const rgbppUdtClient = await createRgbppClient(client);
+    const rgbppBtcWallet = await createBrowserBtcWallet(signer);
+
+    // Step 0: Prepare UTXO Seal
+    pipeline = activateStep(pipeline, 0, onUpdate);
+    const utxoSeal = await rgbppBtcWallet.prepareUtxoSeal();
+    pipeline = completeStep(pipeline, 0, onUpdate, {
+      txHash: utxoSeal.txid,
+      detail: `UTXO: ${utxoSeal.txid}:${utxoSeal.vout}`,
+      chain: 'btc',
+    });
+
+    // Step 1: Build RGB++ Lock Script
+    pipeline = activateStep(pipeline, 1, onUpdate);
+    const rgbppLock = await rgbppUdtClient.buildRgbppLockScript(utxoSeal);
+    pipeline = completeStep(pipeline, 1, onUpdate);
+
+    // Step 2: Compose CKB Transaction
+    pipeline = activateStep(pipeline, 2, onUpdate);
+    const scriptInfo = await client.getKnownScript(ccc.KnownScript.XUdt);
+    const udtInstance = new Udt(
+      scriptInfo.cellDeps[0].cellDep.outPoint,
+      ccc.Script.from({
+        codeHash: scriptInfo.codeHash,
+        hashType: scriptInfo.hashType,
+        args: udtScriptArgs,
+      }),
+    );
+    const { res: tx } = await udtInstance.transfer(signer, [
+      { to: rgbppLock, amount },
+    ]);
+    const txWithInputs = await udtInstance.completeBy(tx, signer);
+    await txWithInputs.completeFeeBy(signer);
+    pipeline = completeStep(pipeline, 2, onUpdate, { chain: 'ckb' });
+
+    // Step 3: Sign CKB Transaction
+    pipeline = activateStep(pipeline, 3, onUpdate);
+    const signedTx = await signer.signTransaction(txWithInputs);
+    pipeline = completeStep(pipeline, 3, onUpdate, { chain: 'ckb' });
+
+    // Step 4: Broadcast to CKB
+    pipeline = activateStep(pipeline, 4, onUpdate);
+    const txHash = await client.sendTransaction(signedTx);
+    pipeline = completeStep(pipeline, 4, onUpdate, {
+      txHash,
+      chain: 'ckb',
+    });
+
+    // Step 5: Wait for CKB Confirmation
+    pipeline = activateStep(pipeline, 5, onUpdate);
+    await client.waitTransaction(txHash);
+    pipeline = completeStep(pipeline, 5, onUpdate, { txHash, chain: 'ckb' });
+
+    // Done
+    pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+    onUpdate(pipeline);
+    return pipeline;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error('[udtLeapToBtc] Error:', errorMsg);
+
+    // Find the active step and mark it as failed
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, errorMsg, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
 }
 
 /**

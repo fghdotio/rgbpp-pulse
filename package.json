@@ -10,12 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bitcoinerlab/secp256k1": "1.1.1",
     "@ckb-ccc/connector-react": "workspace:*",
     "@ckb-ccc/core": "workspace:*",
     "@ckb-ccc/rgbpp": "workspace:*",
     "@ckb-ccc/shell": "workspace:*",
     "@ckb-ccc/udt": "workspace:*",
+    "bitcoinjs-lib": "6.1.6",
     "buffer": "^6.0.3",
+    "ecpair": "2.1.0",
     "events": "^3.3.0",
     "lucide-react": "^1.8.0",
     "process": "^0.11.10",
