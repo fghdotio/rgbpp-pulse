@@ -64,6 +64,34 @@ export async function createBrowserBtcWallet(btcSigner: ccc.SignerBtc) {
 }
 
 /**
+ * Lazily create a CkbRgbppUnlockSigner for signing RGB++ unlock witnesses.
+ * Required for transfer-on-btc and leap-to-ckb operations.
+ */
+export async function createUnlockSigner(ckbClient: ccc.Client, btcAddress: string) {
+  const { CkbRgbppUnlockSigner } = await import(
+    /* @vite-ignore */
+    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/signer/index'
+  );
+  const { ScriptManager } = await import(
+    /* @vite-ignore */
+    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/script/manager'
+  );
+  const { ClientScriptProvider } = await import(
+    /* @vite-ignore */
+    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/script/provider'
+  );
+  const dataSource = await loadBtcDataSource();
+  const scriptManager = new ScriptManager(new ClientScriptProvider(ckbClient));
+  const scriptInfos = await scriptManager.getRgbppScriptInfos();
+  return new CkbRgbppUnlockSigner({
+    ckbClient,
+    rgbppBtcAddress: btcAddress,
+    rgbppDataSource: dataSource,
+    scriptInfos,
+  });
+}
+
+/**
  * Check if a signer is a BTC signer (supports BTC PSBT signing).
  */
 export function isBtcSigner(signer: ccc.Signer): signer is ccc.SignerBtc {

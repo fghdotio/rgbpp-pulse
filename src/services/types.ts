@@ -67,6 +67,30 @@ export interface TransactionPipeline {
   status: 'pending' | 'active' | 'completed' | 'error';
 }
 
+/**
+ * Checkpoint for UDT Leap to BTC recovery.
+ *
+ * Persisted to localStorage at critical points (after BTC broadcast,
+ * after BTC confirmation, after CKB broadcast) so the transaction
+ * can be resumed after a page refresh.
+ *
+ * Recoverable scenarios:
+ * - lastCompletedStep=1: BTC broadcast done → resume waitForConfirmation + CKB
+ * - lastCompletedStep=2: BTC confirmed → redo CKB side from scratch
+ * - lastCompletedStep=6: CKB broadcast done → resume waitTransaction
+ */
+export interface LeapToBtcCheckpoint {
+  pipelineId: string;
+  udtScriptArgs: string;
+  amount: string; // bigint serialized as string
+  btcTxId?: string;
+  sealOutputIndex?: number;
+  ckbTxHash?: string;
+  /** Index of the last fully completed pipeline step (0-7) */
+  lastCompletedStep: number;
+  createdAt: number;
+}
+
 /** BTC receiver for RGB++ operations */
 export interface RgbppBtcReceiver {
   address: string;
@@ -86,6 +110,10 @@ export interface UdtLeapToBtcParams {
 export interface UdtTransferOnBtcParams {
   udtScriptArgs: string;
   receivers: RgbppBtcReceiver[];
+  /** The CCC signer (must be a BTC signer for transfer-on-btc) */
+  signer?: import('@ckb-ccc/core').ccc.Signer;
+  /** The CKB client instance */
+  client?: import('@ckb-ccc/core').ccc.Client;
 }
 
 export interface UdtLeapToCkbParams {

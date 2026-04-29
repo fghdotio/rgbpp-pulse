@@ -145,7 +145,6 @@ export function WalletConnect() {
 
   // Determine the display address for the collapsed pill
   const displayAddr = walletAddress || btcAddress || 'Connected';
-  const displayChain: 'ckb' | 'btc' = btcAddress && (!walletAddress || isBtcLike(walletAddress)) ? 'btc' : 'ckb';
 
   const handleNotify = (msg: string) => {
     notify('info', 'Copied', msg);

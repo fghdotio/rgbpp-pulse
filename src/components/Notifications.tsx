@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { X, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 

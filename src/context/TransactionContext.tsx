@@ -1,15 +1,17 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { TransactionPipeline } from '../services/types';
 
 const STORAGE_KEY = 'rgbpp_transaction_pipelines';
 
 /**
  * Serialize pipelines to localStorage.
- * BigInt values are not expected in TransactionPipeline so JSON.stringify is safe.
+ * Uses a BigInt replacer as a safety net in case BigInt leaks into pipeline data.
  */
 function savePipelines(pipelines: TransactionPipeline[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pipelines));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pipelines, (_k, v) =>
+      typeof v === 'bigint' ? v.toString() : v,
+    ));
   } catch {
     // localStorage might be full or disabled — silently ignore
   }

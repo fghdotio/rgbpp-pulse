@@ -8,13 +8,7 @@
  */
 import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
-import { getAddressAssets, getAddressBalance, getAssetTypeInfo, type RgbppCell, type CkbScript } from './api';
-
-// ─── Known xUDT code hashes (testnet) ─────────────────────
-const KNOWN_XUDT_CODE_HASHES = [
-  '0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb', // xUDT
-  '0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4', // sUDT compatible
-];
+import { getAddressAssets, getAddressBalance, getAssetTypeInfo, type RgbppCell } from './api';
 
 const KNOWN_SPORE_CODE_HASHES = [
   '0x685a60219309029d01310311dba953d67029170ca4848a4ff638e57002c036a0', // Spore
@@ -250,11 +244,6 @@ export async function fetchSporeAssets(btcAddress: string): Promise<SporeAsset[]
 function isSporeCell(cell: RgbppCell): boolean {
   if (!cell.cellOutput.type) return false;
   return KNOWN_SPORE_CODE_HASHES.includes(cell.cellOutput.type.codeHash);
-}
-
-function isUdtCell(cell: RgbppCell): boolean {
-  if (!cell.cellOutput.type) return false;
-  return KNOWN_XUDT_CODE_HASHES.includes(cell.cellOutput.type.codeHash);
 }
 
 /**

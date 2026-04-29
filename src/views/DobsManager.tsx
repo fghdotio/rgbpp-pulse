@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTransactions } from '../context/TransactionContext';
 import { SporeCard } from '../components/AssetCard';
@@ -21,7 +21,7 @@ export function DobsManager() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isConnected) { setAssets([]); return; }
+    if (!isConnected) { return; }
     setLoading(true);
     (btcAddress ? fetchSporeAssets(btcAddress) : Promise.resolve(getMockSporeAssets()))
       .then(setAssets)

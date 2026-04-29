@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { UdtAsset, SporeAsset } from '../services/types';
 import { formatAmount, formatAddress } from '../utils/format';
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Gem, FlaskConical, Copy, Check } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Gem, FlaskConical } from 'lucide-react';
 
 interface UdtCardProps {
   asset: UdtAsset;
@@ -54,46 +54,7 @@ const mockBadge = () => (
   </span>
 );
 
-function CopyableHash({ text, display }: { text: string; display: string }) {
-  const [copied, setCopied] = useState(false);
 
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  };
-
-  return (
-    <span
-      onClick={handleCopy}
-      title={copied ? 'Copied!' : `Copy ${text}`}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px',
-        fontSize: '0.6875rem',
-        color: 'var(--text-muted)',
-        fontFamily: 'monospace',
-        cursor: 'pointer',
-        borderRadius: '4px',
-        padding: '2px 4px',
-        margin: '-2px -4px',
-        transition: 'all 150ms ease',
-        background: copied ? 'rgba(30, 215, 96, 0.1)' : 'transparent',
-      }}
-      onMouseEnter={(e) => { if (!copied) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-      onMouseLeave={(e) => { if (!copied) e.currentTarget.style.background = 'transparent'; }}
-    >
-      {display}
-      {copied
-        ? <Check size={10} color="var(--green)" style={{ flexShrink: 0 }} />
-        : <Copy size={10} style={{ flexShrink: 0, opacity: 0.5 }} />
-      }
-    </span>
-  );
-}
 
 const actionButton = (
   label: string,

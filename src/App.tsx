@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Sidebar } from './components/Sidebar';
 import { WalletConnect } from './components/WalletConnect';
 import { Notifications } from './components/Notifications';

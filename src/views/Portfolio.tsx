@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTransactions } from '../context/TransactionContext';
 import { UdtCard, SporeCard } from '../components/AssetCard';
 import { ActionModal } from '../components/ActionModal';
 import { showToast } from '../components/Toast';
-import { fetchUdtAssets, fetchSporeAssets, getMockUdtAssets, getMockSporeAssets } from '../services/assets';
+import { fetchUdtAssets, fetchSporeAssets, getMockUdtAssets } from '../services/assets';
 import { udtLeapToBtc, udtTransferOnBtc, udtLeapToCkb, sporeLeapToBtc, sporeTransferOnBtc, sporeLeapToCkb } from '../services/rgbpp';
 import type { RgbppOperation, UdtAsset, SporeAsset } from '../services/types';
-import { Wallet, Coins, Gem, Loader2, Box, Zap } from 'lucide-react';
+import { Wallet, Loader2, Box, Zap } from 'lucide-react';
 
 export function Portfolio() {
   const { isConnected, walletAddress, btcAddress, signer, client, setView, openConnector } = useApp();
-  const { activePipelines, upsertPipeline } = useTransactions();
+  const { upsertPipeline } = useTransactions();
   const [modal, setModal] = useState<{ type: 'udt' | 'spore'; op: RgbppOperation; name: string; args: string; udtAsset?: UdtAsset } | null>(null);
   const [udtAssets, setUdtAssets] = useState<UdtAsset[]>([]);
   const [sporeAssets, setSporeAssets] = useState<SporeAsset[]>([]);
@@ -20,8 +20,6 @@ export function Portfolio() {
   // Fetch real assets when connected
   useEffect(() => {
     if (!isConnected) {
-      setUdtAssets([]);
-      setSporeAssets([]);
       return;
     }
 
@@ -70,7 +68,7 @@ export function Portfolio() {
     if (modal.type === 'udt') {
       const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
       if (modal.op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: modal.args, amount: amt, signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
-      if (modal.op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
+      if (modal.op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }], signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
       if (modal.op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
     } else {
       if (modal.op === 'leap-to-btc') sporeLeapToBtc({ sporeTypeArgs: modal.args }, onUpdate);
@@ -216,8 +214,8 @@ export function Portfolio() {
           operation={modal.op}
           assetName={modal.name}
           udtInfo={modal.udtAsset}
-          ckbAddress={walletAddress}
-          btcAddress={btcAddress}
+          ckbAddress={walletAddress ?? undefined}
+          btcAddress={btcAddress ?? undefined}
           onSubmit={handleSubmit}
         />
       )}

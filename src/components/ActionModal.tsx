@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { RgbppOperation, UdtAsset } from '../services/types';
-import { formatAmount, formatAddress } from '../utils/format';
+import { formatAmount } from '../utils/format';
 import { X, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check } from 'lucide-react';
 
 interface Props {
