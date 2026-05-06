@@ -35,6 +35,16 @@ export interface SporeAsset {
   clusterName?: string;
   location: AssetLocation;
   isMock?: boolean;
+  /** Decoded DOB traits from dob-decoder-standalone-server */
+  dobTraits?: import('./dob').DobTrait[];
+  /** Decoded DOB content metadata (dna, block_number, etc.) */
+  dobContent?: Record<string, unknown>;
+  /** Whether DOB decoding has been attempted */
+  dobDecoded?: boolean;
+  /** DOB preview image URI (from prev.bg trait) — can be http, btcfs://, ipfs:// */
+  dobImageUri?: string;
+  /** Rendered SVG string from @ckb-ccc/dob-render */
+  dobSvg?: string;
 }
 
 /** Union type for all RGB++ assets */

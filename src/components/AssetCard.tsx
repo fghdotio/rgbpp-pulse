@@ -1,6 +1,7 @@
 import React from 'react';
 import type { UdtAsset, SporeAsset } from '../services/types';
 import { formatAmount, formatAddress } from '../utils/format';
+import { DobImage } from './DobImage';
 import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Gem, FlaskConical } from 'lucide-react';
 
 interface UdtCardProps {
@@ -11,9 +12,10 @@ interface UdtCardProps {
 interface SporeCardProps {
   asset: SporeAsset;
   onAction: (op: 'leap-to-btc' | 'transfer-on-btc' | 'leap-to-ckb') => void;
+  onClick?: () => void;
 }
 
-const locationBadge = (location: 'ckb' | 'btc') => (
+export const locationBadge = (location: 'ckb' | 'btc') => (
   <span
     style={{
       display: 'inline-flex',
@@ -32,7 +34,7 @@ const locationBadge = (location: 'ckb' | 'btc') => (
   </span>
 );
 
-const mockBadge = () => (
+export const mockBadge = () => (
   <span
     style={{
       display: 'inline-flex',
@@ -56,7 +58,7 @@ const mockBadge = () => (
 
 
 
-const actionButton = (
+export const actionButton = (
   label: string,
   icon: React.ReactNode,
   onClick: () => void,
@@ -160,15 +162,23 @@ export function UdtCard({ asset, onAction }: UdtCardProps) {
   );
 }
 
-export function SporeCard({ asset, onAction }: SporeCardProps) {
+/**
+ * SporeCard — compact card for the grid view.
+ * Shows preview, name, ID. Clickable to open detail modal.
+ * Traits and DOB info are shown in the detail modal, not here.
+ */
+export function SporeCard({ asset, onClick }: SporeCardProps) {
+  const dobName = asset.clusterName || 'DOB';
+
   return (
     <div
+      onClick={onClick}
       style={{
         background: 'var(--bg-surface)',
         borderRadius: 'var(--radius-lg)',
         padding: '16px',
         transition: 'all 250ms ease',
-        cursor: 'default',
+        cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'var(--bg-elevated)';
@@ -187,7 +197,7 @@ export function SporeCard({ asset, onAction }: SporeCardProps) {
           width: '100%',
           aspectRatio: '1',
           borderRadius: 'var(--radius-md)',
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          background: (asset.dobSvg || asset.dobImageUri) ? 'var(--bg-base)' : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -196,7 +206,23 @@ export function SporeCard({ asset, onAction }: SporeCardProps) {
           position: 'relative',
         }}
       >
-        <Gem size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+        {/* Decoding shimmer */}
+        {!asset.dobDecoded && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.03) 50%, transparent 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s ease-in-out infinite',
+            }}
+          />
+        )}
+        {(asset.dobSvg || asset.dobImageUri) ? (
+          <DobImage svg={asset.dobSvg} uri={asset.dobImageUri} compact />
+        ) : (
+          <Gem size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+        )}
         <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
           {asset.isMock && mockBadge()}
           {locationBadge(asset.location)}
@@ -204,9 +230,9 @@ export function SporeCard({ asset, onAction }: SporeCardProps) {
       </div>
 
       {/* Info */}
-      <div style={{ marginBottom: '12px' }}>
+      <div>
         <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '2px' }}>
-          {asset.clusterName || 'DOB'}
+          {dobName}
         </div>
         <div
           style={{
@@ -220,16 +246,6 @@ export function SporeCard({ asset, onAction }: SporeCardProps) {
         >
           {formatAddress(asset.id, 8, 6)}
         </div>
-        <div style={{ fontSize: '0.625rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          {asset.contentType}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {asset.location === 'ckb' && actionButton('Leap to BTC', <ArrowUpRight size={11} />, () => onAction('leap-to-btc'))}
-        {asset.location === 'btc' && actionButton('Transfer', <ArrowLeftRight size={11} />, () => onAction('transfer-on-btc'))}
-        {asset.location === 'btc' && actionButton('Leap to CKB', <ArrowDownLeft size={11} />, () => onAction('leap-to-ckb'))}
       </div>
     </div>
   );

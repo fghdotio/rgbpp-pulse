@@ -9,9 +9,19 @@
 import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
 import { getAddressAssets, getAddressBalance, getAssetTypeInfo, type RgbppCell } from './api';
+import { batchDecodeDobs, renderDobToSvg } from './dob';
 
+/**
+ * Spore type script code_hashes from spore-contract VERSIONS.md
+ * https://github.com/sporeprotocol/spore-contract/blob/master/docs/VERSIONS.md
+ */
 const KNOWN_SPORE_CODE_HASHES = [
-  '0x685a60219309029d01310311dba953d67029170ca4848a4ff638e57002c036a0', // Spore
+  // testnet v0.2.2-beta.2
+  '0x685a60219309029d01310311dba953d67029170ca4848a4ff638e57002130a0d',
+  // mainnet v0.2.2-beta.1
+  '0x4a4dce1df3dffff7f8b2cd7dff7303df3b6150c9788cb75dcf6747247132b9f5',
+  // testnet v0.2.1 (deprecated, but may still have live cells)
+  '0x5e063b4c0e7abeaa6a428df3b693521a3050934cf3b0ae97a800d1bc31449398',
 ];
 
 /**
@@ -191,10 +201,231 @@ export async function fetchUdtAssets(
 }
 
 /**
- * Fetch real Spore assets from the RGB++ API.
- * Parses cell type scripts to detect Spore cells and fetches metadata.
+ * Parse Spore cell data (molecule table format) to extract contentType and clusterId.
+ *
+ * SporeData molecule table layout:
+ *   [0..4)   total_size (LE u32)
+ *   [4..8)   offset_content_type (LE u32)
+ *   [8..12)  offset_content (LE u32)
+ *   [12..16) offset_cluster_id (LE u32)
+ *   [offset_content_type..offset_content) content_type field (Bytes: 4-byte LE len + utf8)
+ *   [offset_content..offset_cluster_id) content field (Bytes)
+ *   [offset_cluster_id..total_size) cluster_id field (BytesOpt: empty or 4-byte LE len + data)
  */
-export async function fetchSporeAssets(btcAddress: string): Promise<SporeAsset[]> {
+function parseSporeData(data: string): { contentType: string; clusterId: string } {
+  const result = { contentType: 'unknown', clusterId: '' };
+  try {
+    if (!data || data === '0x') return result;
+    const hex = data.startsWith('0x') ? data.slice(2) : data;
+    if (hex.length < 32) return result; // at least 4 offsets = 16 bytes
+
+    const readU32LE = (offset: number) => {
+      const bytes = hex.slice(offset * 2, offset * 2 + 8);
+      return (
+        parseInt(bytes.slice(0, 2), 16) |
+        (parseInt(bytes.slice(2, 4), 16) << 8) |
+        (parseInt(bytes.slice(4, 6), 16) << 16) |
+        (parseInt(bytes.slice(6, 8), 16) << 24)
+      ) >>> 0;
+    };
+
+    const offsetCT = readU32LE(4);  // offset to content_type field
+    const offsetC = readU32LE(8);   // offset to content field
+    const offsetCI = readU32LE(12); // offset to cluster_id field
+    const totalSize = readU32LE(0);
+
+    // Parse content_type: Bytes = [len_u32_LE] + [utf8 data]
+    if (offsetC > offsetCT + 4) {
+      const ctDataLen = readU32LE(offsetCT);
+      if (ctDataLen > 0 && ctDataLen < 200) {
+        const ctHex = hex.slice((offsetCT + 4) * 2, (offsetCT + 4 + ctDataLen) * 2);
+        const bytes = new Uint8Array(ctHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+        result.contentType = new TextDecoder().decode(bytes);
+      }
+    }
+
+    // Parse cluster_id: BytesOpt = empty or [len_u32_LE] + [data]
+    if (totalSize > offsetCI + 4) {
+      const ciDataLen = readU32LE(offsetCI);
+      if (ciDataLen === 32) {
+        result.clusterId = '0x' + hex.slice((offsetCI + 4) * 2, (offsetCI + 4 + 32) * 2);
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return result;
+}
+
+/**
+ * Parse Cluster cell data (molecule table) to extract name and description.
+ *
+ * ClusterData molecule table layout:
+ *   [0..4)   total_size
+ *   [4..8)   offset_name
+ *   [8..12)  offset_description
+ *   [offset_name..offset_description) name field (Bytes: 4-byte LE len + utf8)
+ *   [offset_description..total_size) description field (Bytes)
+ */
+function parseClusterData(data: string): { name: string; description: string } {
+  const result = { name: '', description: '' };
+  try {
+    if (!data || data === '0x') return result;
+    const hex = data.startsWith('0x') ? data.slice(2) : data;
+    if (hex.length < 24) return result;
+
+    const readU32LE = (offset: number) => {
+      const bytes = hex.slice(offset * 2, offset * 2 + 8);
+      return (
+        parseInt(bytes.slice(0, 2), 16) |
+        (parseInt(bytes.slice(2, 4), 16) << 8) |
+        (parseInt(bytes.slice(4, 6), 16) << 16) |
+        (parseInt(bytes.slice(6, 8), 16) << 24)
+      ) >>> 0;
+    };
+
+    const totalSize = readU32LE(0);
+    const offsetName = readU32LE(4);
+    const offsetDesc = readU32LE(8);
+
+    // Parse name
+    if (offsetDesc > offsetName + 4) {
+      const nameLen = readU32LE(offsetName);
+      if (nameLen > 0 && nameLen < 500) {
+        const nameHex = hex.slice((offsetName + 4) * 2, (offsetName + 4 + nameLen) * 2);
+        const bytes = new Uint8Array(nameHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+        result.name = new TextDecoder().decode(bytes);
+      }
+    }
+
+    // Parse description
+    if (totalSize > offsetDesc + 4) {
+      const descLen = readU32LE(offsetDesc);
+      if (descLen > 0 && descLen < 10000) {
+        const descHex = hex.slice((offsetDesc + 4) * 2, (offsetDesc + 4 + descLen) * 2);
+        const bytes = new Uint8Array(descHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+        result.description = new TextDecoder().decode(bytes);
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return result;
+}
+
+/** Cluster code_hashes for looking up cluster cells via CKB RPC */
+const KNOWN_CLUSTER_CODE_HASHES = [
+  // testnet v0.2.2-beta.2
+  '0x0bbe768b519d8ea7b96d58f1182eb7e6ef96c541fbd9526975077ee09f049058',
+  // mainnet v0.2.2-beta.1
+  '0x7366a61534fa7c7e6225ecc0d828ea3b5366adec2b58206f2ee84995fe030075',
+];
+
+/**
+ * Look up a cluster cell by clusterId via CKB RPC and parse its name.
+ * Caches results in-memory to avoid redundant queries.
+ */
+const clusterNameCache = new Map<string, string>();
+
+async function lookupClusterName(
+  client: ccc.Client,
+  clusterId: string,
+): Promise<string> {
+  if (!clusterId) return '';
+  const cached = clusterNameCache.get(clusterId);
+  if (cached !== undefined) return cached;
+
+  try {
+    for (const codeHash of KNOWN_CLUSTER_CODE_HASHES) {
+      for await (const cell of client.findCells(
+        {
+          script: {
+            codeHash,
+            hashType: 'data1',
+            args: clusterId,
+          },
+          scriptType: 'type',
+          scriptSearchMode: 'exact',
+          withData: true,
+        },
+        'desc',
+        1,
+      )) {
+        const { name } = parseClusterData(cell.outputData ?? '0x');
+        clusterNameCache.set(clusterId, name);
+        return name;
+      }
+    }
+  } catch {
+    // lookup failed
+  }
+  clusterNameCache.set(clusterId, '');
+  return '';
+}
+
+/**
+ * Fetch CKB-native Spore assets by querying the CKB indexer via CCC SDK.
+ * All data is resolved via CKB RPC — no btc-assets-api calls.
+ */
+export async function fetchCkbSporeAssets(
+  client: ccc.Client,
+  signer: ccc.Signer,
+): Promise<SporeAsset[]> {
+  const spores: SporeAsset[] = [];
+
+  try {
+    const addressObjs = await signer.getAddressObjs();
+
+    for (const codeHash of KNOWN_SPORE_CODE_HASHES) {
+      for (const { script: lockScript } of addressObjs) {
+        for await (const cell of client.findCells(
+          {
+            script: lockScript,
+            scriptType: 'lock',
+            scriptSearchMode: 'exact',
+            filter: {
+              script: {
+                codeHash,
+                hashType: 'data1',
+                args: '0x', // prefix match — matches all Spore IDs
+              },
+            },
+            withData: true,
+          },
+          'desc',
+          50,
+        )) {
+          if (!cell.cellOutput.type) continue;
+
+          const typeArgs = cell.cellOutput.type.args;
+          const { contentType, clusterId } = parseSporeData(cell.outputData ?? '0x');
+
+          // Look up cluster name via CKB RPC
+          const clusterName = await lookupClusterName(client, clusterId);
+
+          spores.push({
+            type: 'spore',
+            id: typeArgs,
+            contentType,
+            content: '',
+            clusterId,
+            clusterName,
+            location: 'ckb',
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch CKB Spore assets via CCC SDK:', err);
+  }
+
+  return spores;
+}
+
+/**
+ * Fetch RGB++-bound Spore assets from the RGB++ API.
+ */
+export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAsset[]> {
   try {
     const cells = await getAddressAssets(btcAddress);
     const sporeCells = cells.filter((cell) => isSporeCell(cell));
@@ -208,7 +439,6 @@ export async function fetchSporeAssets(btcAddress: string): Promise<SporeAsset[]
       let clusterId = '';
       let contentType = 'unknown';
 
-      // Try to get type info from the API
       try {
         const info = await getAssetTypeInfo(typeScript);
         if (info && info.type === 'spore') {
@@ -219,8 +449,7 @@ export async function fetchSporeAssets(btcAddress: string): Promise<SporeAsset[]
           }
         }
       } catch {
-        // Parse data field for content type if API fails
-        contentType = parseSporeContentType(cell.data) || 'unknown';
+        contentType = parseSporeData(cell.data).contentType;
       }
 
       spores.push({
@@ -236,9 +465,90 @@ export async function fetchSporeAssets(btcAddress: string): Promise<SporeAsset[]
 
     return spores;
   } catch (err) {
-    console.warn('Failed to fetch Spore assets from API:', err);
+    console.warn('Failed to fetch RGB++ Spore assets from API:', err);
     return [];
   }
+}
+
+/**
+ * Fetch all Spore assets (CKB-native + RGB++-bound),
+ * then batch-decode DOB traits via the decoder server.
+ */
+export async function fetchSporeAssets(
+  _btcAddress: string | null,
+  client?: ccc.Client,
+  signer?: ccc.Signer,
+): Promise<SporeAsset[]> {
+  const results: SporeAsset[] = [];
+
+  // CKB-native Spores via CCC SDK
+  if (client && signer) {
+    const ckbSpores = await fetchCkbSporeAssets(client, signer);
+    results.push(...ckbSpores);
+  }
+
+  // TODO: RGB++-bound Spores via API (temporarily disabled)
+  // if (btcAddress) {
+  //   const rgbppSpores = await fetchRgbppSporeAssets(btcAddress);
+  //   results.push(...rgbppSpores);
+  // }
+
+  return results;
+}
+
+/**
+ * Batch decode DOB traits for an array of SporeAssets (mutates in-place).
+ * Separated from fetchSporeAssets so the UI can show spores immediately
+ * and fill in traits asynchronously.
+ */
+export async function enrichSporesWithDob(spores: SporeAsset[]): Promise<SporeAsset[]> {
+  if (spores.length === 0) return spores;
+
+  const ids = spores.map((s) => s.id);
+
+  try {
+    const decoded = await batchDecodeDobs(ids);
+
+    // Phase 1: attach traits and extract metadata
+    const renderJobs: Promise<void>[] = [];
+
+    for (const spore of spores) {
+      const key = spore.id.toLowerCase();
+      const result = decoded.get(key);
+      spore.dobDecoded = true;
+      if (result) {
+        spore.dobTraits = result.traits;
+        spore.dobContent = result.dobContent;
+
+        // Extract prev.bg as DOB preview image fallback
+        const bgTrait = result.traits.find((t) => t.name === 'prev.bg');
+        if (bgTrait && typeof bgTrait.value === 'string') {
+          spore.dobImageUri = bgTrait.value;
+        }
+
+        // Phase 2: render SVG via dob-render (in parallel)
+        renderJobs.push(
+          renderDobToSvg(result.renderOutput)
+            .then((svg) => {
+              if (svg) spore.dobSvg = svg;
+            })
+            .catch((err) => {
+              console.warn(`SVG render failed for ${spore.id.slice(0, 14)}:`, err);
+            })
+        );
+      }
+    }
+
+    // Wait for all SVG renders to complete
+    await Promise.allSettled(renderJobs);
+  } catch (err) {
+    console.warn('Failed to batch decode DOBs:', err);
+    for (const spore of spores) {
+      spore.dobDecoded = true;
+    }
+  }
+
+  return spores;
 }
 
 function isSporeCell(cell: RgbppCell): boolean {
@@ -246,27 +556,7 @@ function isSporeCell(cell: RgbppCell): boolean {
   return KNOWN_SPORE_CODE_HASHES.includes(cell.cellOutput.type.codeHash);
 }
 
-/**
- * Parse spore data to extract content type (basic heuristic).
- * Spore data format: content_type_len (4 bytes LE) + content_type + content_len (4 bytes LE) + content
- */
-function parseSporeContentType(data: string): string | null {
-  try {
-    if (!data || data === '0x') return null;
-    const hex = data.startsWith('0x') ? data.slice(2) : data;
-    if (hex.length < 8) return null;
-    // First 4 bytes LE = total header length, skip it
-    // Bytes 4-8 LE = content type length
-    const ctLen = parseInt(hex.slice(8, 10) + hex.slice(10, 12), 16);
-    if (ctLen > 0 && ctLen < 100) {
-      const ctHex = hex.slice(12, 12 + ctLen * 2);
-      return Buffer.from(ctHex, 'hex').toString('utf-8');
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return null;
-}
+
 
 // ─── Mock Data (Fallback) ───────────────────────────────────
 
@@ -311,47 +601,5 @@ export function getMockUdtAssets(): UdtAsset[] {
   ];
 }
 
-export function getMockSporeAssets(): SporeAsset[] {
-  return [
-    {
-      type: 'spore',
-      id: '0x8d814f7306d31bdfa40ddec0d3c9391c5505a7e9c0917596a8535e2a81ef3ab2',
-      contentType: 'image/png',
-      content: '',
-      clusterId: '0xabc123',
-      clusterName: 'CKB Punks',
-      location: 'btc',
-      isMock: true,
-    },
-    {
-      type: 'spore',
-      id: '0x01eb873a190a200cdf3a21ee823663e3f2d5d220b0dee6033fd06a67c43cb733',
-      contentType: 'image/svg+xml',
-      content: '',
-      clusterId: '0xdef456',
-      clusterName: 'Nervos Art',
-      location: 'ckb',
-      isMock: true,
-    },
-    {
-      type: 'spore',
-      id: '0xb1bf3620fa9caf55bd5e6ca05a99013cb48ba5cbf522efc34cc098da4a1cb1fe',
-      contentType: 'image/png',
-      content: '',
-      clusterId: '0xabc123',
-      clusterName: 'CKB Punks',
-      location: 'btc',
-      isMock: true,
-    },
-    {
-      type: 'spore',
-      id: '0x8ce8307ac273c6e5548bd1a5dbf6596aab5dd5e75259a092b5461d3dba1c34bf',
-      contentType: 'application/json',
-      content: '',
-      clusterName: 'Unique Items',
-      location: 'ckb',
-      isMock: true,
-    },
-  ];
-}
+
 

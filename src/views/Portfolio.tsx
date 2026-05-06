@@ -29,7 +29,7 @@ export function Portfolio() {
       try {
         const [udts, spores] = await Promise.all([
           fetchUdtAssets(btcAddress, client, signer),
-          btcAddress ? fetchSporeAssets(btcAddress) : Promise.resolve([]),
+          btcAddress ? fetchSporeAssets(btcAddress, client, signer) : Promise.resolve([]),
         ]);
         setUdtAssets(udts);
         setSporeAssets(spores);
