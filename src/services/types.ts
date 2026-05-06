@@ -1,5 +1,5 @@
 /* ============================================================
-   Type Definitions for RGB++ Asset Manager
+   Type Definitions for RGB++ Pulse
    ============================================================ */
 
 /** Supported operations on RGB++ assets */
@@ -68,25 +68,47 @@ export interface TransactionPipeline {
 }
 
 /**
- * Checkpoint for UDT Leap to BTC recovery.
+ * Checkpoint for RGB++ transaction recovery.
  *
  * Persisted to localStorage at critical points (after BTC broadcast,
- * after BTC confirmation, after CKB broadcast) so the transaction
- * can be resumed after a page refresh.
+ * after CKB broadcast) so the transaction can be resumed after a page refresh.
  *
- * Recoverable scenarios:
+ * Supports all three UDT operations:
+ *
+ * **leap-to-btc** (operation='leap-to-btc' or undefined for legacy):
  * - lastCompletedStep=1: BTC broadcast done → resume waitForConfirmation + CKB
  * - lastCompletedStep=2: BTC confirmed → redo CKB side from scratch
  * - lastCompletedStep=6: CKB broadcast done → resume waitTransaction
+ *
+ * **transfer-on-btc** (operation='transfer-on-btc'):
+ * - lastCompletedStep=3: BTC broadcast done → deserialize persisted CKB partial tx, inject btcTxId, sign+send
+ * - lastCompletedStep=6: CKB broadcast done → resume waitTransaction
+ *
+ * **leap-to-ckb** (operation='leap-to-ckb'):
+ * - lastCompletedStep=4: BTC broadcast done → deserialize persisted CKB partial tx, inject btcTxId, sign+send
+ * - lastCompletedStep=7: CKB broadcast done → resume waitTransaction
  */
 export interface LeapToBtcCheckpoint {
   pipelineId: string;
+  /** Identifies which operation this checkpoint belongs to. Legacy leap-to-btc checkpoints may omit this. */
+  operation?: RgbppOperation;
   udtScriptArgs: string;
   amount: string; // bigint serialized as string
+  /** Serialized receivers for transfer-on-btc and leap-to-ckb */
+  receivers?: { address: string; amount: string }[];
   btcTxId?: string;
   sealOutputIndex?: number;
   ckbTxHash?: string;
-  /** Index of the last fully completed pipeline step (0-7) */
+  /**
+   * Serialized `indexedCkbPartialTx` (via ccc.stringify) from buildPsbt.
+   *
+   * The BTC TX contains a commitment (hash) to the CKB partial TX structure.
+   * On recovery, the exact same CKB partial TX must be used — rebuilding it
+   * risks different UTXO selection, which would produce a mismatched commitment
+   * and cause the RGB++ on-chain verifier to reject the CKB TX.
+   */
+  serializedCkbPartialTx?: string;
+  /** Index of the last fully completed pipeline step */
   lastCompletedStep: number;
   createdAt: number;
 }
@@ -119,6 +141,10 @@ export interface UdtTransferOnBtcParams {
 export interface UdtLeapToCkbParams {
   udtScriptArgs: string;
   receivers: { address: string; amount: bigint }[];
+  /** The CCC signer (must be a BTC signer for leap-to-ckb) */
+  signer?: import('@ckb-ccc/core').ccc.Signer;
+  /** The CKB client instance */
+  client?: import('@ckb-ccc/core').ccc.Client;
 }
 
 /** Parameters for Spore operations */

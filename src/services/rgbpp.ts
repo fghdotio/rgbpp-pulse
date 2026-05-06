@@ -25,6 +25,57 @@ import { createRgbppClient, createBrowserBtcWallet, createUnlockSigner, isBtcSig
 import { saveCheckpoint, clearCheckpoint } from './checkpoint';
 
 /**
+ * Extract a human-readable message from an unknown caught value.
+ * Handles Error instances, plain objects (JSON-serialized), and primitives.
+ */
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  try {
+    return JSON.stringify(err, null, 2);
+  } catch {
+    return String(err);
+  }
+}
+
+// ─── Global Signing Mutex ────────────────────────────────────
+//
+// Browser wallet extensions (OKX, UniSat, JoyID) can only handle one
+// approval popup at a time. Concurrent signing requests cause:
+//   "Another approval request is already pending" (-32603)
+//
+// This mutex serializes all operations that trigger wallet signing,
+// including both user-initiated transactions and checkpoint recovery.
+
+let _signingLock: Promise<unknown> = Promise.resolve();
+
+/**
+ * Acquire the global signing lock. Returns a release function.
+ * While the lock is held, subsequent callers will wait.
+ */
+function acquireSigningLock(): { ready: Promise<void>; release: () => void } {
+  let release: () => void;
+  const next = new Promise<void>((resolve) => { release = resolve; });
+  const ready = _signingLock.then(() => {});
+  _signingLock = _signingLock.then(() => next);
+  return { ready, release: release! };
+}
+
+/**
+ * Execute `fn` while holding the global signing lock.
+ * The lock is automatically released after `fn` settles (resolves or rejects).
+ */
+async function withSigningLock<T>(fn: () => Promise<T>): Promise<T> {
+  const lock = acquireSigningLock();
+  await lock.ready;
+  try {
+    return await fn();
+  } finally {
+    lock.release();
+  }
+}
+
+/**
  * Create a fresh pipeline with the given steps.
  */
 function createPipeline(
@@ -193,15 +244,14 @@ export async function udtLeapToBtc(
   try {
     const rgbppUdtClient = await createRgbppClient(client);
     const rgbppBtcWallet = await createBrowserBtcWallet(signer);
-
     // Step 0: Build Seal PSBT
     pipeline = activateStep(pipeline, 0, onUpdate);
     const { psbt, sealOutputIndex } = await rgbppBtcWallet.buildSealPsbt();
     pipeline = completeStep(pipeline, 0, onUpdate, { chain: 'btc' });
 
-    // Step 1: Sign & Broadcast BTC TX
+    // Step 1: Sign & Broadcast BTC TX (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 1, onUpdate);
-    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
+    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
     pipeline = completeStep(pipeline, 1, onUpdate, {
       txHash: btcTxId,
       detail: `BTC TX: ${btcTxId}`,
@@ -263,9 +313,9 @@ export async function udtLeapToBtc(
     await txWithInputs.completeFeeBy(signer);
     pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
 
-    // Step 5: Sign CKB Transaction
+    // Step 5: Sign CKB Transaction (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 5, onUpdate);
-    const signedTx = await signer.signTransaction(txWithInputs);
+    const signedTx = await withSigningLock(() => signer.signTransaction(txWithInputs));
     pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
     // Step 6: Broadcast to CKB
@@ -299,7 +349,7 @@ export async function udtLeapToBtc(
     onUpdate(pipeline);
     return pipeline;
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = formatError(err);
     const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
     const activeLabel = activeIndex >= 0 ? pipeline.steps[activeIndex].label : 'unknown';
     console.error(`[udtLeapToBtc] Error at step "${activeLabel}":`, err);
@@ -408,9 +458,9 @@ export async function resumeUdtLeapToBtc(
       await txWithInputs.completeFeeBy(signer);
       pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
 
-      // Step 5: Sign CKB Transaction (user will see wallet popup)
+      // Step 5: Sign CKB Transaction (acquire signing lock for wallet popup)
       pipeline = activateStep(pipeline, 5, onUpdate);
-      const signedTx = await signer.signTransaction(txWithInputs);
+      const signedTx = await withSigningLock(() => signer.signTransaction(txWithInputs));
       pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
       // Step 6: Broadcast to CKB
@@ -438,8 +488,238 @@ export async function resumeUdtLeapToBtc(
     // Shouldn't reach here — mark as error
     throw new Error('Checkpoint data insufficient for recovery');
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[Recovery] Failed to resume pipeline ${pipeline.id}:`, errorMsg);
+    const errorMsg = formatError(err);
+    console.error(`[Recovery] Failed to resume pipeline ${pipeline.id}:`, errorMsg, err);
+
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, `Recovery failed: ${errorMsg}`, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
+}
+
+/**
+ * Resume a UDT Transfer-on-BTC transaction from a checkpoint after page refresh.
+ *
+ * Recovery paths based on lastCompletedStep:
+ * - 3: BTC broadcast done → deserialize persisted CKB partial tx, inject btcTxId, sign, broadcast, wait
+ * - 6: CKB broadcast done → resume waiting for CKB confirmation
+ */
+export async function resumeUdtTransferOnBtc(
+  checkpoint: LeapToBtcCheckpoint,
+  pipeline: TransactionPipeline,
+  signer: ccc.SignerBtc,
+  client: ccc.Client,
+  onUpdate: (p: TransactionPipeline) => void,
+): Promise<TransactionPipeline> {
+  console.log(`[Recovery] Resuming udtTransferOnBtc pipeline ${pipeline.id} from step ${checkpoint.lastCompletedStep}`);
+
+  try {
+    const rgbppUdtClient = await createRgbppClient(client);
+    const btcAddress = await signer.getInternalAddress();
+    const ckbRgbppUnlockSigner = await createUnlockSigner(client, btcAddress);
+
+    // ── Resume CKB confirmation if CKB was already broadcast ──
+    if (checkpoint.lastCompletedStep === 6 && checkpoint.ckbTxHash) {
+      pipeline = activateStep(pipeline, 7, onUpdate);
+      const steps = [...pipeline.steps];
+      steps[7] = { ...steps[7], detail: 'Resuming after page refresh...' };
+      pipeline = { ...pipeline, steps };
+      onUpdate(pipeline);
+
+      await client.waitTransaction(checkpoint.ckbTxHash);
+      pipeline = completeStep(pipeline, 7, onUpdate, {
+        txHash: checkpoint.ckbTxHash,
+        chain: 'ckb',
+      });
+
+      clearCheckpoint(pipeline.id);
+      pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+      onUpdate(pipeline);
+      return pipeline;
+    }
+
+    // ── Restore CKB partial tx from checkpoint after BTC broadcast (step 3) ──
+    if (checkpoint.lastCompletedStep === 3 && checkpoint.btcTxId) {
+      if (!checkpoint.serializedCkbPartialTx) {
+        throw new Error(
+          'Checkpoint missing serializedCkbPartialTx — cannot recover. ' +
+          'The CKB partial TX must exactly match the BTC commitment.',
+        );
+      }
+
+      // Deserialize the exact CKB partial TX that was used to build the BTC commitment
+      pipeline = activateStep(pipeline, 4, onUpdate);
+      const steps4 = [...pipeline.steps];
+      steps4[4] = { ...steps4[4], detail: 'Recovering — restoring CKB tx from checkpoint...' };
+      pipeline = { ...pipeline, steps: steps4 };
+      onUpdate(pipeline);
+
+      const indexedCkbPartialTx = ccc.Transaction.from(
+        JSON.parse(checkpoint.serializedCkbPartialTx),
+      );
+
+      // Inject btcTxId
+      const ckbPartialTxInjected = await rgbppUdtClient.injectTxIdToRgbppCkbTx(
+        indexedCkbPartialTx,
+        checkpoint.btcTxId,
+      );
+      pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
+
+      // Sign RGB++ CKB tx (acquire signing lock for wallet popups)
+      pipeline = activateStep(pipeline, 5, onUpdate);
+      const ckbFinalTx = await withSigningLock(async () => {
+        const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+        await rgbppSignedCkbTx.completeFeeBy(signer);
+        return signer.signTransaction(rgbppSignedCkbTx);
+      });
+      pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
+
+      // Broadcast CKB
+      pipeline = activateStep(pipeline, 6, onUpdate);
+      const txHash = await client.sendTransaction(ckbFinalTx);
+      pipeline = completeStep(pipeline, 6, onUpdate, { txHash, chain: 'ckb' });
+
+      saveCheckpoint({
+        ...checkpoint,
+        ckbTxHash: txHash,
+        lastCompletedStep: 6,
+      });
+
+      // Wait for CKB confirmation
+      pipeline = activateStep(pipeline, 7, onUpdate);
+      await client.waitTransaction(txHash);
+      pipeline = completeStep(pipeline, 7, onUpdate, { txHash, chain: 'ckb' });
+
+      clearCheckpoint(pipeline.id);
+      pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+      onUpdate(pipeline);
+      return pipeline;
+    }
+
+    throw new Error('Checkpoint data insufficient for recovery');
+  } catch (err) {
+    const errorMsg = formatError(err);
+    console.error(`[Recovery] Failed to resume transfer-on-btc pipeline ${pipeline.id}:`, errorMsg, err);
+
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, `Recovery failed: ${errorMsg}`, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
+}
+
+/**
+ * Resume a UDT Leap-to-CKB transaction from a checkpoint after page refresh.
+ *
+ * Recovery paths based on lastCompletedStep:
+ * - 4: BTC broadcast done → deserialize persisted CKB partial tx, inject btcTxId, sign, broadcast, wait
+ * - 7: CKB broadcast done → resume waiting for CKB confirmation
+ */
+export async function resumeUdtLeapToCkb(
+  checkpoint: LeapToBtcCheckpoint,
+  pipeline: TransactionPipeline,
+  signer: ccc.SignerBtc,
+  client: ccc.Client,
+  onUpdate: (p: TransactionPipeline) => void,
+): Promise<TransactionPipeline> {
+  console.log(`[Recovery] Resuming udtLeapToCkb pipeline ${pipeline.id} from step ${checkpoint.lastCompletedStep}`);
+
+  try {
+    const rgbppUdtClient = await createRgbppClient(client);
+    const btcAddress = await signer.getInternalAddress();
+    const ckbRgbppUnlockSigner = await createUnlockSigner(client, btcAddress);
+
+    // ── Resume CKB confirmation if CKB was already broadcast ──
+    if (checkpoint.lastCompletedStep === 7 && checkpoint.ckbTxHash) {
+      pipeline = activateStep(pipeline, 8, onUpdate);
+      const steps = [...pipeline.steps];
+      steps[8] = { ...steps[8], detail: 'Resuming after page refresh...' };
+      pipeline = { ...pipeline, steps };
+      onUpdate(pipeline);
+
+      await client.waitTransaction(checkpoint.ckbTxHash);
+      pipeline = completeStep(pipeline, 8, onUpdate, {
+        txHash: checkpoint.ckbTxHash,
+        chain: 'ckb',
+      });
+
+      clearCheckpoint(pipeline.id);
+      pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+      onUpdate(pipeline);
+      return pipeline;
+    }
+
+    // ── Restore CKB partial tx from checkpoint after BTC broadcast (step 4) ──
+    if (checkpoint.lastCompletedStep === 4 && checkpoint.btcTxId) {
+      if (!checkpoint.serializedCkbPartialTx) {
+        throw new Error(
+          'Checkpoint missing serializedCkbPartialTx — cannot recover. ' +
+          'The CKB partial TX must exactly match the BTC commitment.',
+        );
+      }
+
+      // Deserialize the exact CKB partial TX that was used to build the BTC commitment
+      pipeline = activateStep(pipeline, 5, onUpdate);
+      const steps5 = [...pipeline.steps];
+      steps5[5] = { ...steps5[5], detail: 'Recovering — restoring CKB tx from checkpoint...' };
+      pipeline = { ...pipeline, steps: steps5 };
+      onUpdate(pipeline);
+
+      const indexedCkbPartialTx = ccc.Transaction.from(
+        JSON.parse(checkpoint.serializedCkbPartialTx),
+      );
+
+      // Inject btcTxId
+      const ckbPartialTxInjected = await rgbppUdtClient.injectTxIdToRgbppCkbTx(
+        indexedCkbPartialTx,
+        checkpoint.btcTxId,
+      );
+      pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
+
+      // Sign RGB++ CKB tx (acquire signing lock for wallet popups)
+      pipeline = activateStep(pipeline, 6, onUpdate);
+      const ckbFinalTx = await withSigningLock(async () => {
+        const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+        await rgbppSignedCkbTx.completeFeeBy(signer);
+        return signer.signTransaction(rgbppSignedCkbTx);
+      });
+      pipeline = completeStep(pipeline, 6, onUpdate, { chain: 'ckb' });
+
+      // Broadcast CKB
+      pipeline = activateStep(pipeline, 7, onUpdate);
+      const txHash = await client.sendTransaction(ckbFinalTx);
+      pipeline = completeStep(pipeline, 7, onUpdate, { txHash, chain: 'ckb' });
+
+      saveCheckpoint({
+        ...checkpoint,
+        ckbTxHash: txHash,
+        lastCompletedStep: 7,
+      });
+
+      // Wait for CKB confirmation
+      pipeline = activateStep(pipeline, 8, onUpdate);
+      await client.waitTransaction(txHash);
+      pipeline = completeStep(pipeline, 8, onUpdate, { txHash, chain: 'ckb' });
+
+      clearCheckpoint(pipeline.id);
+      pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+      onUpdate(pipeline);
+      return pipeline;
+    }
+
+    throw new Error('Checkpoint data insufficient for recovery');
+  } catch (err) {
+    const errorMsg = formatError(err);
+    console.error(`[Recovery] Failed to resume leap-to-ckb pipeline ${pipeline.id}:`, errorMsg, err);
 
     const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
     if (activeIndex >= 0) {
@@ -540,12 +820,28 @@ export async function udtTransferOnBtc(
     });
     pipeline = completeStep(pipeline, 2, onUpdate, { chain: 'btc' });
 
-    // Step 3: Sign & Broadcast BTC TX
+    // Step 3: Sign & Broadcast BTC TX (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 3, onUpdate);
-    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
+    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
     pipeline = completeStep(pipeline, 3, onUpdate, {
       txHash: btcTxId,
       chain: 'btc',
+    });
+
+    // ── Checkpoint: BTC broadcast done ──
+    // Persist the indexedCkbPartialTx so recovery uses the exact CKB TX
+    // that matches the BTC commitment, rather than rebuilding (which risks
+    // different UTXO selection → commitment mismatch → on-chain rejection).
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'transfer-on-btc',
+      udtScriptArgs,
+      amount: '0',
+      receivers: receivers.map((r) => ({ address: r.address, amount: r.amount.toString() })),
+      btcTxId,
+      serializedCkbPartialTx: ccc.stringify(indexedCkbPartialTx),
+      lastCompletedStep: 3,
+      createdAt: Date.now(),
     });
 
     // Step 4: Inject BTC TX ID to CKB
@@ -556,11 +852,13 @@ export async function udtTransferOnBtc(
     );
     pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
 
-    // Step 5: Sign RGB++ CKB Transaction
+    // Step 5: Sign RGB++ CKB Transaction (acquire signing lock for wallet popups)
     pipeline = activateStep(pipeline, 5, onUpdate);
-    const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-    await rgbppSignedCkbTx.completeFeeBy(signer);
-    const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
+    const ckbFinalTx = await withSigningLock(async () => {
+      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+      await rgbppSignedCkbTx.completeFeeBy(signer);
+      return signer.signTransaction(rgbppSignedCkbTx);
+    });
     pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
     // Step 6: Broadcast to CKB
@@ -568,18 +866,32 @@ export async function udtTransferOnBtc(
     const txHash = await client.sendTransaction(ckbFinalTx);
     pipeline = completeStep(pipeline, 6, onUpdate, { txHash, chain: 'ckb' });
 
+    // ── Checkpoint: CKB broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'transfer-on-btc',
+      udtScriptArgs,
+      amount: '0',
+      receivers: receivers.map((r) => ({ address: r.address, amount: r.amount.toString() })),
+      btcTxId,
+      ckbTxHash: txHash,
+      lastCompletedStep: 6,
+      createdAt: Date.now(),
+    });
+
     // Step 7: Wait for CKB Confirmation
     pipeline = activateStep(pipeline, 7, onUpdate);
     await client.waitTransaction(txHash);
     pipeline = completeStep(pipeline, 7, onUpdate, { txHash, chain: 'ckb' });
 
-    // Done
+    // Done — clear checkpoint
+    clearCheckpoint(pipeline.id);
     pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
     onUpdate(pipeline);
     return pipeline;
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error('[udtTransferOnBtc] Error:', errorMsg);
+    const errorMsg = formatError(err);
+    console.error('[udtTransferOnBtc] Error:', errorMsg, err);
     const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
     if (activeIndex >= 0) {
       pipeline = failStep(pipeline, activeIndex, errorMsg, onUpdate);
@@ -592,31 +904,186 @@ export async function udtTransferOnBtc(
 }
 
 /**
- * UDT: Leap from BTC to CKB
+ * UDT: Leap from BTC to CKB (REAL IMPLEMENTATION)
  *
- * Real flow (from rgbpp-udt-leap-to-ckb.ts):
- * 1. Build BTC time lock via rgbppUdtClient.buildBtcTimeLockScript(address)
- * 2. udt.transfer(ckbSigner, receivers mapped to timeLock)
- * 3. Build pseudo lock, completeChangeToLock
- * 4. buildPsbt + signAndBroadcast
- * 5. injectTxIdToRgbppCkbTx + sign + send
+ * Flow (from rgbpp-udt-leap-to-ckb.ts):
+ * 1. Build BTC time lock scripts for each CKB receiver address
+ * 2. Compose CKB partial tx via udt.transfer with time-locked outputs
+ * 3. Build pseudo RGB++ lock + completeChangeToLock to collect inputs
+ * 4. Build BTC PSBT from CKB partial tx
+ * 5. Sign & broadcast BTC tx
+ * 6. Inject BTC txId into CKB partial tx
+ * 7. Sign RGB++ CKB tx (unlock signer + user signer)
+ * 8. Broadcast CKB tx
+ * 9. Wait for CKB confirmation
+ *
+ * Falls back to simulation if signer/client are not provided.
  */
 export async function udtLeapToCkb(
-  _params: UdtLeapToCkbParams,
+  params: UdtLeapToCkbParams,
   onUpdate: (p: TransactionPipeline) => void,
 ): Promise<TransactionPipeline> {
-  const pipeline = createPipeline('leap-to-ckb', 'udt', 'UDT', [
-    'Building BTC Time Lock',
+  const { udtScriptArgs, receivers, signer, client } = params;
+
+  let pipeline = createPipeline('leap-to-ckb', 'udt', 'UDT', [
+    'Building BTC Time Locks',
     'Composing CKB Partial Transaction',
+    'Collecting UDT Inputs',
     'Building BTC PSBT',
     'Signing & Broadcasting BTC TX',
     'Injecting TX ID to CKB',
     'Signing RGB++ CKB Transaction',
     'Broadcasting to CKB',
-    'Waiting for Confirmation',
+    'Waiting for CKB Confirmation',
   ]);
   onUpdate(pipeline);
-  return simulatePipeline(pipeline, onUpdate);
+
+  // Fallback to simulation if no signer/client
+  if (!signer || !client) {
+    console.warn('[udtLeapToCkb] No signer/client provided, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  if (!isBtcSigner(signer)) {
+    console.warn('[udtLeapToCkb] Signer is not a BTC signer, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  try {
+    const rgbppUdtClient = await createRgbppClient(client);
+    const rgbppBtcWallet = await createBrowserBtcWallet(signer);
+    const btcAddress = await signer.getInternalAddress();
+    const ckbRgbppUnlockSigner = await createUnlockSigner(client, btcAddress);
+
+    // Step 0: Build BTC Time Lock scripts for each CKB receiver
+    pipeline = activateStep(pipeline, 0, onUpdate);
+    const timeLockOutputs = await Promise.all(
+      receivers.map(async (r) => ({
+        to: await rgbppUdtClient.buildBtcTimeLockScript(r.address),
+        amount: r.amount,
+      })),
+    );
+    pipeline = completeStep(pipeline, 0, onUpdate, {
+      detail: `${receivers.length} time lock(s) built`,
+    });
+
+    // Step 1: Compose CKB Partial Transaction
+    pipeline = activateStep(pipeline, 1, onUpdate);
+    const scriptInfo = await client.getKnownScript(ccc.KnownScript.XUdt);
+    const udtInstance = new Udt(
+      scriptInfo.cellDeps[0].cellDep.outPoint,
+      ccc.Script.from({
+        codeHash: scriptInfo.codeHash,
+        hashType: scriptInfo.hashType,
+        args: udtScriptArgs,
+      }),
+    );
+    const { res: tx } = await udtInstance.transfer(signer, timeLockOutputs);
+    pipeline = completeStep(pipeline, 1, onUpdate, { chain: 'ckb' });
+
+    // Step 2: Collect UDT Inputs (completeChangeToLock)
+    pipeline = activateStep(pipeline, 2, onUpdate);
+    const pseudoRgbppLock = await rgbppUdtClient.buildPseudoRgbppLockScript();
+    const txWithInputs = await udtInstance.completeChangeToLock(
+      tx,
+      ckbRgbppUnlockSigner,
+      pseudoRgbppLock,
+    );
+    pipeline = completeStep(pipeline, 2, onUpdate, { chain: 'ckb' });
+
+    // Step 3: Build BTC PSBT
+    pipeline = activateStep(pipeline, 3, onUpdate);
+    const { psbt, indexedCkbPartialTx } = await rgbppBtcWallet.buildPsbt({
+      ckbPartialTx: txWithInputs,
+      ckbClient: client,
+      rgbppUdtClient,
+      btcChangeAddress: btcAddress,
+      receiverBtcAddresses: [], // leap-to-ckb has no BTC receivers
+    });
+    pipeline = completeStep(pipeline, 3, onUpdate, { chain: 'btc' });
+
+    // Step 4: Sign & Broadcast BTC TX (acquire signing lock for wallet popup)
+    pipeline = activateStep(pipeline, 4, onUpdate);
+    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    pipeline = completeStep(pipeline, 4, onUpdate, {
+      txHash: btcTxId,
+      chain: 'btc',
+    });
+
+    // ── Checkpoint: BTC broadcast done ──
+    // Persist the indexedCkbPartialTx so recovery uses the exact CKB TX
+    // that matches the BTC commitment, rather than rebuilding.
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'leap-to-ckb',
+      udtScriptArgs,
+      amount: '0',
+      receivers: receivers.map((r) => ({ address: r.address, amount: r.amount.toString() })),
+      btcTxId,
+      serializedCkbPartialTx: ccc.stringify(indexedCkbPartialTx),
+      lastCompletedStep: 4,
+      createdAt: Date.now(),
+    });
+
+    // Step 5: Inject BTC TX ID to CKB
+    pipeline = activateStep(pipeline, 5, onUpdate);
+    const ckbPartialTxInjected = await rgbppUdtClient.injectTxIdToRgbppCkbTx(
+      indexedCkbPartialTx,
+      btcTxId,
+    );
+    pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
+
+    // Step 6: Sign RGB++ CKB Transaction (acquire signing lock for wallet popups)
+    pipeline = activateStep(pipeline, 6, onUpdate);
+    const ckbFinalTx = await withSigningLock(async () => {
+      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+      await rgbppSignedCkbTx.completeFeeBy(signer);
+      return signer.signTransaction(rgbppSignedCkbTx);
+    });
+    pipeline = completeStep(pipeline, 6, onUpdate, { chain: 'ckb' });
+
+    // Step 7: Broadcast to CKB
+    pipeline = activateStep(pipeline, 7, onUpdate);
+    const txHash = await client.sendTransaction(ckbFinalTx);
+    pipeline = completeStep(pipeline, 7, onUpdate, { txHash, chain: 'ckb' });
+
+    // ── Checkpoint: CKB broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'leap-to-ckb',
+      udtScriptArgs,
+      amount: '0',
+      receivers: receivers.map((r) => ({ address: r.address, amount: r.amount.toString() })),
+      btcTxId,
+      ckbTxHash: txHash,
+      lastCompletedStep: 7,
+      createdAt: Date.now(),
+    });
+
+    // Step 8: Wait for CKB Confirmation
+    pipeline = activateStep(pipeline, 8, onUpdate);
+    await client.waitTransaction(txHash);
+    pipeline = completeStep(pipeline, 8, onUpdate, { txHash, chain: 'ckb' });
+
+    // Done — clear checkpoint
+    clearCheckpoint(pipeline.id);
+    pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+    onUpdate(pipeline);
+    return pipeline;
+  } catch (err) {
+    const errorMsg = formatError(err);
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    const activeLabel = activeIndex >= 0 ? pipeline.steps[activeIndex].label : 'unknown';
+    console.error(`[udtLeapToCkb] Error at step "${activeLabel}":`, err);
+
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, errorMsg, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
 }
 
 // ─── Spore Operations ───────────────────────────────────────

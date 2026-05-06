@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ccc.Provider
       defaultClient={new ccc.ClientPublicTestnet()}
-      name="RGB++ Asset Manager"
+      name="RGB++ Pulse"
     >
       <AppProvider>
         <TransactionProvider>

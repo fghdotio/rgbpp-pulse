@@ -6,7 +6,7 @@ import { ActionModal } from '../components/ActionModal';
 import { showToast } from '../components/Toast';
 import { fetchUdtAssets, fetchSporeAssets, getMockUdtAssets } from '../services/assets';
 import { udtLeapToBtc, udtTransferOnBtc, udtLeapToCkb, sporeLeapToBtc, sporeTransferOnBtc, sporeLeapToCkb } from '../services/rgbpp';
-import type { RgbppOperation, UdtAsset, SporeAsset } from '../services/types';
+import type { RgbppOperation, UdtAsset, SporeAsset, TransactionPipeline } from '../services/types';
 import { Wallet, Loader2, Box, Zap } from 'lucide-react';
 
 export function Portfolio() {
@@ -63,24 +63,37 @@ export function Portfolio() {
   const handleSubmit = async (params: { address: string; amount: string }) => {
     if (!modal) return;
     const opLabel = modal.op === 'leap-to-btc' ? 'Leap to BTC' : modal.op === 'transfer-on-btc' ? 'Transfer on BTC' : 'Leap to CKB';
-    const onUpdate = upsertPipeline;
+    const assetName = modal.name;
+
+    // Wrap onUpdate to detect when the first broadcast step completes,
+    // then show the toast at that point instead of immediately.
+    let toastShown = false;
+    const onUpdate = (p: TransactionPipeline) => {
+      upsertPipeline(p);
+      if (!toastShown) {
+        const hasBroadcast = p.steps.some(
+          (s) => s.status === 'done' && s.label.toLowerCase().includes('broadcasting'),
+        );
+        if (hasBroadcast) {
+          toastShown = true;
+          showToast(`${opLabel} submitted · ${assetName}`, {
+            label: 'View',
+            onClick: () => setView('transactions'),
+          });
+        }
+      }
+    };
 
     if (modal.type === 'udt') {
       const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
       if (modal.op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: modal.args, amount: amt, signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
       if (modal.op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }], signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
-      if (modal.op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }] }, onUpdate);
+      if (modal.op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: modal.args, receivers: [{ address: params.address, amount: amt }], signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
     } else {
       if (modal.op === 'leap-to-btc') sporeLeapToBtc({ sporeTypeArgs: modal.args }, onUpdate);
       if (modal.op === 'transfer-on-btc') sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: modal.args }] }, onUpdate);
       if (modal.op === 'leap-to-ckb') sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: modal.args }, onUpdate);
     }
-
-    // Show toast with "View" action — no auto-navigation
-    showToast(`${opLabel} submitted · ${modal.name}`, {
-      label: 'View',
-      onClick: () => setView('transactions'),
-    });
   };
 
   if (!isConnected) {

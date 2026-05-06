@@ -6,7 +6,7 @@ import { ActionModal } from '../components/ActionModal';
 import { showToast } from '../components/Toast';
 import { fetchUdtAssets, getMockUdtAssets } from '../services/assets';
 import { udtLeapToBtc, udtTransferOnBtc, udtLeapToCkb } from '../services/rgbpp';
-import type { RgbppOperation, UdtAsset } from '../services/types';
+import type { RgbppOperation, UdtAsset, TransactionPipeline } from '../services/types';
 import { Coins, Search, Loader2 } from 'lucide-react';
 
 /**
@@ -38,15 +38,31 @@ export function UdtManager() {
     if (!modal) return;
     const { op, asset } = modal;
     const opLabel = op === 'leap-to-btc' ? 'Leap to BTC' : op === 'transfer-on-btc' ? 'Transfer on BTC' : 'Leap to CKB';
-    const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
-    if (op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: asset.typeScriptArgs, amount: amt, signer: signer ?? undefined, client: client ?? undefined }, upsertPipeline);
-    if (op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: asset.typeScriptArgs, receivers: [{ address: params.address, amount: amt }], signer: signer ?? undefined, client: client ?? undefined }, upsertPipeline);
-    if (op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: asset.typeScriptArgs, receivers: [{ address: params.address, amount: amt }] }, upsertPipeline);
+    const assetSymbol = asset.symbol;
 
-    showToast(`${opLabel} submitted · ${asset.symbol}`, {
-      label: 'View',
-      onClick: () => setView('transactions'),
-    });
+    // Wrap onUpdate to detect when the first broadcast step completes,
+    // then show the toast at that point instead of immediately.
+    let toastShown = false;
+    const onUpdate = (p: TransactionPipeline) => {
+      upsertPipeline(p);
+      if (!toastShown) {
+        const hasBroadcast = p.steps.some(
+          (s) => s.status === 'done' && s.label.toLowerCase().includes('broadcasting'),
+        );
+        if (hasBroadcast) {
+          toastShown = true;
+          showToast(`${opLabel} submitted · ${assetSymbol}`, {
+            label: 'View',
+            onClick: () => setView('transactions'),
+          });
+        }
+      }
+    };
+
+    const amt = BigInt(Math.floor(parseFloat(params.amount) * 1e8));
+    if (op === 'leap-to-btc') udtLeapToBtc({ udtScriptArgs: asset.typeScriptArgs, amount: amt, signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
+    if (op === 'transfer-on-btc') udtTransferOnBtc({ udtScriptArgs: asset.typeScriptArgs, receivers: [{ address: params.address, amount: amt }], signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
+    if (op === 'leap-to-ckb') udtLeapToCkb({ udtScriptArgs: asset.typeScriptArgs, receivers: [{ address: params.address, amount: amt }], signer: signer ?? undefined, client: client ?? undefined }, onUpdate);
   };
 
   if (!isConnected) {

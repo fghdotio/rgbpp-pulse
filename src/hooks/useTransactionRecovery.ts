@@ -23,7 +23,7 @@ import { useTransactions } from '../context/TransactionContext';
 import { useApp } from '../context/AppContext';
 import type { TransactionPipeline } from '../services/types';
 import { loadCheckpoint } from '../services/checkpoint';
-import { resumeUdtLeapToBtc } from '../services/rgbpp';
+import { resumeUdtLeapToBtc, resumeUdtTransferOnBtc, resumeUdtLeapToCkb } from '../services/rgbpp';
 import { isBtcSigner } from '../services/rgbppSetup';
 
 /**
@@ -64,45 +64,32 @@ export function useTransactionRecovery() {
     const activePipelines = pipelines.filter((p) => p.status === 'active');
     if (activePipelines.length === 0) return;
 
+    // Partition pipelines into those needing sequential recovery (wallet signing)
+    // and those that can run concurrently (CKB confirmation waits only).
+    const checkpointRecoveries: Array<{
+      pipeline: TransactionPipeline;
+      checkpoint: ReturnType<typeof loadCheckpoint> & {};
+    }> = [];
+
     for (const pipeline of activePipelines) {
-      // Skip if already being recovered
       if (recoveredRef.current.has(pipeline.id)) continue;
 
-      // ── Strategy 1: Checkpoint-based recovery ──
       const checkpoint = loadCheckpoint(pipeline.id);
       if (checkpoint) {
-        // Checkpoint recovery for leap-to-btc requires a BTC signer
-        if (!signer || !isBtcSigner(signer)) {
-          // Signer not yet available or not BTC — wait for next render
-          continue;
-        }
-
+        if (!signer || !isBtcSigner(signer)) continue;
         recoveredRef.current.add(pipeline.id);
-        console.log(
-          `[Recovery] Found checkpoint for pipeline ${pipeline.id}, ` +
-          `lastCompletedStep=${checkpoint.lastCompletedStep}`,
-        );
-
-        resumeUdtLeapToBtc(
-          checkpoint,
-          pipeline,
-          signer,
-          client,
-          upsertPipeline,
-        ).catch((err) => {
-          console.error(`[Recovery] Unhandled error for pipeline ${pipeline.id}:`, err);
-        });
+        checkpointRecoveries.push({ pipeline, checkpoint });
         continue;
       }
 
       // ── Strategy 2: Label-based CKB confirmation recovery (legacy) ──
+      // These only call client.waitTransaction — no signing needed, safe to fire concurrently.
       if (isWaitingForCkbConfirmation(pipeline)) {
         const txHash = findCkbBroadcastTxHash(pipeline);
         if (!txHash) {
           markAsInterrupted(pipeline, 'Missing transaction hash for recovery');
           continue;
         }
-
         recoveredRef.current.add(pipeline.id);
         console.log(`[Recovery] Resuming CKB confirmation for pipeline ${pipeline.id}, txHash: ${txHash}`);
         resumeCkbConfirmation(pipeline, txHash);
@@ -116,6 +103,38 @@ export function useTransactionRecovery() {
           markAsInterrupted(pipeline, 'Transaction interrupted by page refresh');
         }
       }
+    }
+
+    // Run checkpoint-based recoveries sequentially so the wallet only sees
+    // one signing request at a time. Browser wallet extensions (UniSat, OKX, etc.)
+    // reject or misbehave when multiple signing popups overlap.
+    if (checkpointRecoveries.length > 0 && signer && isBtcSigner(signer)) {
+      const btcSigner = signer;
+      (async () => {
+        for (const { pipeline, checkpoint } of checkpointRecoveries) {
+          const operation = checkpoint.operation ?? pipeline.operation;
+          console.log(
+            `[Recovery] Found checkpoint for pipeline ${pipeline.id}, ` +
+            `operation=${operation}, lastCompletedStep=${checkpoint.lastCompletedStep}`,
+          );
+
+          try {
+            switch (operation) {
+              case 'transfer-on-btc':
+                await resumeUdtTransferOnBtc(checkpoint, pipeline, btcSigner, client, upsertPipeline);
+                break;
+              case 'leap-to-ckb':
+                await resumeUdtLeapToCkb(checkpoint, pipeline, btcSigner, client, upsertPipeline);
+                break;
+              default:
+                await resumeUdtLeapToBtc(checkpoint, pipeline, btcSigner, client, upsertPipeline);
+                break;
+            }
+          } catch (err) {
+            console.error(`[Recovery] Unhandled error for pipeline ${pipeline.id}:`, err);
+          }
+        }
+      })();
     }
 
     function markAsInterrupted(pipeline: TransactionPipeline, reason: string) {
