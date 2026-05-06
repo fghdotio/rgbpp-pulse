@@ -191,6 +191,58 @@ export async function getRecommendedFees(): Promise<{
   return fetchApi(`/bitcoin/v1/fees/recommended`);
 }
 
+// ─── Activity Types ─────────────────────────────────────────
+
+/** BTC transaction status from activity endpoint */
+export interface BtcTxStatus {
+  confirmed: boolean;
+  block_height?: number;
+  block_hash?: string;
+  block_time?: number;
+}
+
+/** Simplified BTC transaction from activity endpoint */
+export interface ActivityBtcTx {
+  txid: string;
+  status: BtcTxStatus;
+  fee: number;
+}
+
+/** A single transaction in the activity response */
+export interface ActivityTransaction {
+  btcTx: ActivityBtcTx;
+  isRgbpp: boolean;
+  isomorphicTx?: {
+    ckbTx?: { hash: string; [k: string]: unknown };
+    ckbVirtualTx?: unknown;
+    inputs: CellOutput[];
+    outputs: CellOutput[];
+    status: { confirmed: boolean };
+  };
+}
+
+/** Response from GET /rgbpp/v1/address/{addr}/activity */
+export interface AddressActivity {
+  address: string;
+  txs: ActivityTransaction[];
+  cursor?: string;
+}
+
+/**
+ * Get RGB++ activity (transaction history) for a BTC address.
+ * GET /rgbpp/v1/address/{btc_address}/activity
+ */
+export async function getAddressActivity(
+  btcAddress: string,
+  opts?: { rgbppOnly?: boolean; afterBtcTxid?: string },
+): Promise<AddressActivity> {
+  const params = new URLSearchParams();
+  if (opts?.rgbppOnly) params.set('rgbpp_only', 'true');
+  if (opts?.afterBtcTxid) params.set('after_btc_txid', opts.afterBtcTxid);
+  const qs = params.toString();
+  return fetchApi<AddressActivity>(`/rgbpp/v1/address/${btcAddress}/activity${qs ? '?' + qs : ''}`);
+}
+
 /**
  * Poll a transaction job until completion or failure.
  */
