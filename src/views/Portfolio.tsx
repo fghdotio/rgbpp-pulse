@@ -4,7 +4,7 @@ import { useTransactions } from '../context/TransactionContext';
 import { UdtCard, SporeCard } from '../components/AssetCard';
 import { ActionModal } from '../components/ActionModal';
 import { showToast } from '../components/Toast';
-import { fetchUdtAssets, fetchSporeAssets, getMockUdtAssets } from '../services/assets';
+import { fetchUdtAssets, fetchSporeAssets, enrichSporesWithDob, getMockUdtAssets } from '../services/assets';
 import { udtLeapToBtc, udtTransferOnBtc, udtLeapToCkb, sporeLeapToBtc, sporeTransferOnBtc, sporeLeapToCkb } from '../services/rgbpp';
 import type { RgbppOperation, UdtAsset, SporeAsset, TransactionPipeline } from '../services/types';
 import { Wallet, Loader2, Box, Zap } from 'lucide-react';
@@ -33,6 +33,12 @@ export function Portfolio() {
         ]);
         setUdtAssets(udts);
         setSporeAssets(spores);
+
+        // Phase 2: enrich DOBs with traits + SVG (async, updates in place)
+        if (spores.length > 0) {
+          const enriched = await enrichSporesWithDob(spores);
+          setSporeAssets([...enriched]);
+        }
       } catch {
         setUdtAssets(getMockUdtAssets());
         setSporeAssets([]);
