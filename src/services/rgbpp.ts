@@ -1089,81 +1089,485 @@ export async function udtLeapToCkb(
 // ─── Spore Operations ───────────────────────────────────────
 
 /**
- * Spore: Leap from CKB to BTC
+ * Lazily load the spore module to avoid pulling in heavy deps at module load time.
+ */
+async function loadSporeModule() {
+  const { spore } = await import('@ckb-ccc/spore');
+  return spore;
+}
+
+/**
+ * Spore: Leap from CKB to BTC (REAL IMPLEMENTATION)
  *
- * Real flow (from 5-spore-ckb-to-btc.ts):
- * 1. rgbppBtcWallet.buildSealPsbt() + signAndBroadcast() + waitForConfirmation()
- * 2. spore.transferSpore({ signer, id, to: buildRgbppLockScript(utxoSeal) })
- * 3. tx.completeFeeBy(ckbSigner)
- * 4. sign + send CKB tx
+ * Flow (from spore-leap-to-btc.ts):
+ * 1. rgbppBtcWallet.buildSealPsbt()        — build PSBT for seal UTXO
+ * 2. rgbppBtcWallet.signAndBroadcast(psbt)  — sign & broadcast BTC tx
+ * 3. rgbppBtcWallet.waitForConfirmation()   — wait for BTC confirmation
+ * 4. rgbppUdtClient.buildRgbppLockScript()  — build RGB++ lock
+ * 5. spore.transferSpore({ signer, id, to }) — compose CKB tx
+ * 6. tx.completeFeeBy(signer)               — complete fee
+ * 7. signer.signTransaction(tx)             — sign CKB tx
+ * 8. client.sendTransaction(signedTx)       — broadcast CKB tx
+ * 9. client.waitTransaction(txHash)         — wait for CKB confirmation
+ *
+ * Falls back to simulation if signer/client are not provided.
  */
 export async function sporeLeapToBtc(
-  _params: SporeLeapToBtcParams,
+  params: SporeLeapToBtcParams,
   onUpdate: (p: TransactionPipeline) => void,
 ): Promise<TransactionPipeline> {
-  const pipeline = createPipeline('leap-to-btc', 'spore', 'Spore', [
-    'Preparing UTXO Seal',
-    'Transferring Spore to RGB++ Lock',
+  const { sporeTypeArgs, signer, client } = params;
+
+  let pipeline = createPipeline('leap-to-btc', 'spore', 'Spore', [
+    'Building BTC Seal PSBT',
+    'Signing & Broadcasting BTC TX',
+    'Waiting for BTC Confirmation',
+    'Building RGB++ Lock',
+    'Composing CKB Transaction (Spore Transfer)',
     'Completing CKB Fee',
     'Signing CKB Transaction',
     'Broadcasting to CKB',
-    'Waiting for Confirmation',
+    'Waiting for CKB Confirmation',
   ]);
   onUpdate(pipeline);
-  return simulatePipeline(pipeline, onUpdate);
+
+  // Fallback to simulation if no signer/client
+  if (!signer || !client) {
+    console.warn('[sporeLeapToBtc] No signer/client provided, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  if (!isBtcSigner(signer)) {
+    console.warn('[sporeLeapToBtc] Signer is not a BTC signer, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  try {
+    const sporeMod = await loadSporeModule();
+    const rgbppUdtClient = await createRgbppClient(client);
+    const rgbppBtcWallet = await createBrowserBtcWallet(signer);
+
+    // Step 0: Build Seal PSBT
+    pipeline = activateStep(pipeline, 0, onUpdate);
+    const { psbt, sealOutputIndex } = await rgbppBtcWallet.buildSealPsbt();
+    pipeline = completeStep(pipeline, 0, onUpdate, { chain: 'btc' });
+
+    // Step 1: Sign & Broadcast BTC TX
+    pipeline = activateStep(pipeline, 1, onUpdate);
+    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    pipeline = completeStep(pipeline, 1, onUpdate, {
+      txHash: btcTxId,
+      detail: `BTC TX: ${btcTxId}`,
+      chain: 'btc',
+    });
+
+    // ── Checkpoint: BTC broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'leap-to-btc',
+      udtScriptArgs: sporeTypeArgs,
+      amount: '0',
+      btcTxId,
+      sealOutputIndex,
+      lastCompletedStep: 1,
+      createdAt: Date.now(),
+    });
+
+    // Step 2: Wait for BTC Confirmation
+    pipeline = activateStep(pipeline, 2, onUpdate);
+    await rgbppBtcWallet.waitForConfirmation(btcTxId);
+    const utxoSeal = { txid: btcTxId, vout: sealOutputIndex };
+    pipeline = completeStep(pipeline, 2, onUpdate, {
+      txHash: btcTxId,
+      detail: `UTXO Seal: ${btcTxId}:${sealOutputIndex}`,
+      chain: 'btc',
+    });
+
+    // Step 3: Build RGB++ Lock Script
+    pipeline = activateStep(pipeline, 3, onUpdate);
+    const rgbppLock = await rgbppUdtClient.buildRgbppLockScript(utxoSeal);
+    pipeline = completeStep(pipeline, 3, onUpdate);
+
+    // Step 4: Compose CKB Transaction (Spore Transfer)
+    pipeline = activateStep(pipeline, 4, onUpdate);
+    const { tx } = await sporeMod.transferSpore({
+      signer,
+      id: sporeTypeArgs,
+      to: rgbppLock,
+    });
+    pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
+
+    // Step 5: Complete CKB Fee
+    pipeline = activateStep(pipeline, 5, onUpdate);
+    await tx.completeFeeBy(signer);
+    pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
+
+    // Step 6: Sign CKB Transaction
+    pipeline = activateStep(pipeline, 6, onUpdate);
+    const signedTx = await withSigningLock(() => signer.signTransaction(tx));
+    pipeline = completeStep(pipeline, 6, onUpdate, { chain: 'ckb' });
+
+    // Step 7: Broadcast to CKB
+    pipeline = activateStep(pipeline, 7, onUpdate);
+    const txHash = await client.sendTransaction(signedTx);
+    pipeline = completeStep(pipeline, 7, onUpdate, {
+      txHash,
+      chain: 'ckb',
+    });
+
+    // ── Checkpoint: CKB broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'leap-to-btc',
+      udtScriptArgs: sporeTypeArgs,
+      amount: '0',
+      btcTxId,
+      sealOutputIndex,
+      ckbTxHash: txHash,
+      lastCompletedStep: 7,
+      createdAt: Date.now(),
+    });
+
+    // Step 8: Wait for CKB Confirmation
+    pipeline = activateStep(pipeline, 8, onUpdate);
+    await client.waitTransaction(txHash);
+    pipeline = completeStep(pipeline, 8, onUpdate, { txHash, chain: 'ckb' });
+
+    // Done — clear checkpoint
+    clearCheckpoint(pipeline.id);
+    pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+    onUpdate(pipeline);
+    return pipeline;
+  } catch (err) {
+    const errorMsg = formatError(err);
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    const activeLabel = activeIndex >= 0 ? pipeline.steps[activeIndex].label : 'unknown';
+    console.error(`[sporeLeapToBtc] Error at step "${activeLabel}":`, err);
+
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, errorMsg, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
 }
 
 /**
- * Spore: Transfer on BTC
+ * Spore: Transfer on BTC (REAL IMPLEMENTATION)
  *
- * Real flow (from 3-spore-btc-transfer.ts):
- * 1. spore.transferSpore({ signer, id, to: pseudoRgbppLock })
- * 2. rgbppBtcWallet.buildPsbt(...)
- * 3. signAndBroadcast(psbt)
- * 4. injectTxIdToRgbppCkbTx
- * 5. sign RGB++ + CKB, send
+ * Flow (from rgbpp-spore-transfer-on-btc.ts):
+ * 1. Build pseudo RGB++ lock
+ * 2. For each transfer: spore.transferSpore({ signer, id, to: pseudoLock, tx })
+ * 3. Build BTC PSBT from CKB partial tx
+ * 4. Sign & broadcast BTC tx
+ * 5. Inject BTC txId into CKB partial tx
+ * 6. Sign RGB++ CKB tx (unlock signer + user signer)
+ * 7. Broadcast CKB tx
+ * 8. Wait for CKB confirmation
+ *
+ * Falls back to simulation if signer/client are not provided.
  */
 export async function sporeTransferOnBtc(
-  _params: SporeTransferOnBtcParams,
+  params: SporeTransferOnBtcParams,
   onUpdate: (p: TransactionPipeline) => void,
 ): Promise<TransactionPipeline> {
-  const pipeline = createPipeline('transfer-on-btc', 'spore', 'Spore', [
-    'Transferring Spore (CKB Partial)',
+  const { transfers, signer, client } = params;
+
+  let pipeline = createPipeline('transfer-on-btc', 'spore', 'Spore', [
+    'Building CKB Partial Transaction (Spore Transfer)',
     'Building BTC PSBT',
     'Signing & Broadcasting BTC TX',
-    'Injecting TX ID to CKB',
+    'Injecting BTC TX ID to CKB',
     'Signing RGB++ CKB Transaction',
     'Broadcasting to CKB',
-    'Waiting for Confirmation',
+    'Waiting for CKB Confirmation',
   ]);
   onUpdate(pipeline);
-  return simulatePipeline(pipeline, onUpdate);
+
+  // Fallback to simulation if no signer/client
+  if (!signer || !client) {
+    console.warn('[sporeTransferOnBtc] No signer/client provided, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  if (!isBtcSigner(signer)) {
+    console.warn('[sporeTransferOnBtc] Signer is not a BTC signer, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  try {
+    const sporeMod = await loadSporeModule();
+    const rgbppUdtClient = await createRgbppClient(client);
+    const rgbppBtcWallet = await createBrowserBtcWallet(signer);
+    const btcAddress = await signer.getInternalAddress();
+    const ckbRgbppUnlockSigner = await createUnlockSigner(client, btcAddress);
+
+    // Step 0: Build CKB Partial Transaction (Spore Transfer)
+    pipeline = activateStep(pipeline, 0, onUpdate);
+    const pseudoRgbppLock = await rgbppUdtClient.buildPseudoRgbppLockScript();
+
+    let ckbPartialTx = ccc.Transaction.from({});
+    for (const { sporeTypeArgs } of transfers) {
+      const { tx: _ckbPartialTx } = await sporeMod.transferSpore({
+        signer,
+        id: sporeTypeArgs,
+        to: pseudoRgbppLock,
+        tx: ckbPartialTx,
+      });
+      ckbPartialTx = _ckbPartialTx;
+    }
+    pipeline = completeStep(pipeline, 0, onUpdate, { chain: 'ckb' });
+
+    // Step 1: Build BTC PSBT
+    pipeline = activateStep(pipeline, 1, onUpdate);
+    const { psbt, indexedCkbPartialTx } = await rgbppBtcWallet.buildPsbt({
+      ckbPartialTx,
+      ckbClient: client,
+      rgbppUdtClient,
+      btcChangeAddress: btcAddress,
+      receiverBtcAddresses: transfers.map((t) => t.btcAddress),
+    });
+    pipeline = completeStep(pipeline, 1, onUpdate, { chain: 'btc' });
+
+    // Step 2: Sign & Broadcast BTC TX
+    pipeline = activateStep(pipeline, 2, onUpdate);
+    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    pipeline = completeStep(pipeline, 2, onUpdate, {
+      txHash: btcTxId,
+      chain: 'btc',
+    });
+
+    // ── Checkpoint: BTC broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'transfer-on-btc',
+      udtScriptArgs: transfers.map((t) => t.sporeTypeArgs).join(','),
+      amount: '0',
+      btcTxId,
+      serializedCkbPartialTx: ccc.stringify(indexedCkbPartialTx),
+      lastCompletedStep: 2,
+      createdAt: Date.now(),
+    });
+
+    // Step 3: Inject BTC TX ID to CKB
+    pipeline = activateStep(pipeline, 3, onUpdate);
+    const ckbPartialTxInjected = await rgbppUdtClient.injectTxIdToRgbppCkbTx(
+      indexedCkbPartialTx,
+      btcTxId,
+    );
+    pipeline = completeStep(pipeline, 3, onUpdate, { chain: 'ckb' });
+
+    // Step 4: Sign RGB++ CKB Transaction
+    pipeline = activateStep(pipeline, 4, onUpdate);
+    const ckbFinalTx = await withSigningLock(async () => {
+      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+      await rgbppSignedCkbTx.completeFeeBy(signer);
+      return signer.signTransaction(rgbppSignedCkbTx);
+    });
+    pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
+
+    // Step 5: Broadcast to CKB
+    pipeline = activateStep(pipeline, 5, onUpdate);
+    const txHash = await client.sendTransaction(ckbFinalTx);
+    pipeline = completeStep(pipeline, 5, onUpdate, { txHash, chain: 'ckb' });
+
+    // ── Checkpoint: CKB broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'transfer-on-btc',
+      udtScriptArgs: transfers.map((t) => t.sporeTypeArgs).join(','),
+      amount: '0',
+      btcTxId,
+      ckbTxHash: txHash,
+      lastCompletedStep: 5,
+      createdAt: Date.now(),
+    });
+
+    // Step 6: Wait for CKB Confirmation
+    pipeline = activateStep(pipeline, 6, onUpdate);
+    await client.waitTransaction(txHash);
+    pipeline = completeStep(pipeline, 6, onUpdate, { txHash, chain: 'ckb' });
+
+    // Done — clear checkpoint
+    clearCheckpoint(pipeline.id);
+    pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+    onUpdate(pipeline);
+    return pipeline;
+  } catch (err) {
+    const errorMsg = formatError(err);
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    const activeLabel = activeIndex >= 0 ? pipeline.steps[activeIndex].label : 'unknown';
+    console.error(`[sporeTransferOnBtc] Error at step "${activeLabel}":`, err);
+
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, errorMsg, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
 }
 
 /**
- * Spore: Leap from BTC to CKB
+ * Spore: Leap from BTC to CKB (REAL IMPLEMENTATION)
  *
- * Real flow (from 4-spore-btc-to-ckb.ts):
- * 1. spore.transferSpore({ signer, id, to: buildBtcTimeLockScript(address) })
- * 2. buildPsbt + signAndBroadcast
- * 3. injectTxIdToRgbppCkbTx + sign + send
+ * Flow (from rgbpp-spore-leap-to-ckb.ts):
+ * 1. Build BTC time lock script for the CKB receiver address
+ * 2. spore.transferSpore({ signer, id, to: timeLock }) — compose CKB partial tx
+ * 3. Build BTC PSBT from CKB partial tx
+ * 4. Sign & broadcast BTC tx
+ * 5. Inject BTC txId into CKB partial tx
+ * 6. Sign RGB++ CKB tx (unlock signer + user signer)
+ * 7. Broadcast CKB tx
+ * 8. Wait for CKB confirmation
+ *
+ * Falls back to simulation if signer/client are not provided.
  */
 export async function sporeLeapToCkb(
-  _params: SporeLeapToCkbParams,
+  params: SporeLeapToCkbParams,
   onUpdate: (p: TransactionPipeline) => void,
 ): Promise<TransactionPipeline> {
-  const pipeline = createPipeline('leap-to-ckb', 'spore', 'Spore', [
+  const { ckbAddress, sporeTypeArgs, signer, client } = params;
+
+  let pipeline = createPipeline('leap-to-ckb', 'spore', 'Spore', [
     'Building BTC Time Lock',
-    'Transferring Spore',
+    'Composing CKB Partial Transaction (Spore Transfer)',
     'Building BTC PSBT',
     'Signing & Broadcasting BTC TX',
-    'Injecting TX ID to CKB',
+    'Injecting BTC TX ID to CKB',
     'Signing RGB++ CKB Transaction',
     'Broadcasting to CKB',
-    'Waiting for Confirmation',
+    'Waiting for CKB Confirmation',
   ]);
   onUpdate(pipeline);
-  return simulatePipeline(pipeline, onUpdate);
+
+  // Fallback to simulation if no signer/client
+  if (!signer || !client) {
+    console.warn('[sporeLeapToCkb] No signer/client provided, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  if (!isBtcSigner(signer)) {
+    console.warn('[sporeLeapToCkb] Signer is not a BTC signer, falling back to simulation');
+    return simulatePipeline(pipeline, onUpdate);
+  }
+
+  try {
+    const sporeMod = await loadSporeModule();
+    const rgbppUdtClient = await createRgbppClient(client);
+    const rgbppBtcWallet = await createBrowserBtcWallet(signer);
+    const btcAddress = await signer.getInternalAddress();
+    const ckbRgbppUnlockSigner = await createUnlockSigner(client, btcAddress);
+
+    // Step 0: Build BTC Time Lock
+    pipeline = activateStep(pipeline, 0, onUpdate);
+    const timeLock = await rgbppUdtClient.buildBtcTimeLockScript(ckbAddress);
+    pipeline = completeStep(pipeline, 0, onUpdate, {
+      detail: `Time lock for ${ckbAddress.slice(0, 20)}...`,
+    });
+
+    // Step 1: Compose CKB Partial Transaction (Spore Transfer)
+    pipeline = activateStep(pipeline, 1, onUpdate);
+    const { tx: ckbPartialTx } = await sporeMod.transferSpore({
+      signer,
+      id: sporeTypeArgs,
+      to: timeLock,
+    });
+    pipeline = completeStep(pipeline, 1, onUpdate, { chain: 'ckb' });
+
+    // Step 2: Build BTC PSBT
+    pipeline = activateStep(pipeline, 2, onUpdate);
+    const { psbt, indexedCkbPartialTx } = await rgbppBtcWallet.buildPsbt({
+      ckbPartialTx,
+      ckbClient: client,
+      rgbppUdtClient,
+      btcChangeAddress: btcAddress,
+      receiverBtcAddresses: [], // leap-to-ckb has no BTC receivers
+    });
+    pipeline = completeStep(pipeline, 2, onUpdate, { chain: 'btc' });
+
+    // Step 3: Sign & Broadcast BTC TX
+    pipeline = activateStep(pipeline, 3, onUpdate);
+    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    pipeline = completeStep(pipeline, 3, onUpdate, {
+      txHash: btcTxId,
+      chain: 'btc',
+    });
+
+    // ── Checkpoint: BTC broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'leap-to-ckb',
+      udtScriptArgs: sporeTypeArgs,
+      amount: '0',
+      btcTxId,
+      serializedCkbPartialTx: ccc.stringify(indexedCkbPartialTx),
+      lastCompletedStep: 3,
+      createdAt: Date.now(),
+    });
+
+    // Step 4: Inject BTC TX ID to CKB
+    pipeline = activateStep(pipeline, 4, onUpdate);
+    const ckbPartialTxInjected = await rgbppUdtClient.injectTxIdToRgbppCkbTx(
+      indexedCkbPartialTx,
+      btcTxId,
+    );
+    pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
+
+    // Step 5: Sign RGB++ CKB Transaction
+    pipeline = activateStep(pipeline, 5, onUpdate);
+    const ckbFinalTx = await withSigningLock(async () => {
+      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+      await rgbppSignedCkbTx.completeFeeBy(signer);
+      return signer.signTransaction(rgbppSignedCkbTx);
+    });
+    pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
+
+    // Step 6: Broadcast to CKB
+    pipeline = activateStep(pipeline, 6, onUpdate);
+    const txHash = await client.sendTransaction(ckbFinalTx);
+    pipeline = completeStep(pipeline, 6, onUpdate, { txHash, chain: 'ckb' });
+
+    // ── Checkpoint: CKB broadcast done ──
+    saveCheckpoint({
+      pipelineId: pipeline.id,
+      operation: 'leap-to-ckb',
+      udtScriptArgs: sporeTypeArgs,
+      amount: '0',
+      btcTxId,
+      ckbTxHash: txHash,
+      lastCompletedStep: 6,
+      createdAt: Date.now(),
+    });
+
+    // Step 7: Wait for CKB Confirmation
+    pipeline = activateStep(pipeline, 7, onUpdate);
+    await client.waitTransaction(txHash);
+    pipeline = completeStep(pipeline, 7, onUpdate, { txHash, chain: 'ckb' });
+
+    // Done — clear checkpoint
+    clearCheckpoint(pipeline.id);
+    pipeline = { ...pipeline, status: 'completed', completedAt: Date.now() };
+    onUpdate(pipeline);
+    return pipeline;
+  } catch (err) {
+    const errorMsg = formatError(err);
+    const activeIndex = pipeline.steps.findIndex((s) => s.status === 'active');
+    const activeLabel = activeIndex >= 0 ? pipeline.steps[activeIndex].label : 'unknown';
+    console.error(`[sporeLeapToCkb] Error at step "${activeLabel}":`, err);
+
+    if (activeIndex >= 0) {
+      pipeline = failStep(pipeline, activeIndex, errorMsg, onUpdate);
+    } else {
+      pipeline = { ...pipeline, status: 'error' };
+      onUpdate(pipeline);
+    }
+    return pipeline;
+  }
 }
 
 export type { TransactionStep };
+

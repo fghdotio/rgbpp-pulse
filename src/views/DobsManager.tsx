@@ -177,9 +177,9 @@ export function DobsManager() {
   const handleActionSubmit = async (params: { address: string }) => {
     if (!actionModal) return;
     const { op, asset } = actionModal;
-    if (op === 'leap-to-btc') await sporeLeapToBtc({ sporeTypeArgs: asset.id }, upsertPipeline);
-    if (op === 'transfer-on-btc') await sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: asset.id }] }, upsertPipeline);
-    if (op === 'leap-to-ckb') await sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: asset.id }, upsertPipeline);
+    if (op === 'leap-to-btc') await sporeLeapToBtc({ sporeTypeArgs: asset.id, signer, client }, upsertPipeline);
+    if (op === 'transfer-on-btc') await sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: asset.id }], signer, client }, upsertPipeline);
+    if (op === 'leap-to-ckb') await sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: asset.id, signer, client }, upsertPipeline);
   };
 
   if (!isConnected) {

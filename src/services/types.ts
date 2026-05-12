@@ -160,15 +160,27 @@ export interface UdtLeapToCkbParams {
 /** Parameters for Spore operations */
 export interface SporeLeapToBtcParams {
   sporeTypeArgs: string;
+  /** The CCC signer (must be a BTC signer for leap-to-btc) */
+  signer?: import('@ckb-ccc/core').ccc.Signer;
+  /** The CKB client instance */
+  client?: import('@ckb-ccc/core').ccc.Client;
 }
 
 export interface SporeTransferOnBtcParams {
   transfers: { btcAddress: string; sporeTypeArgs: string }[];
+  /** The CCC signer (must be a BTC signer for transfer-on-btc) */
+  signer?: import('@ckb-ccc/core').ccc.Signer;
+  /** The CKB client instance */
+  client?: import('@ckb-ccc/core').ccc.Client;
 }
 
 export interface SporeLeapToCkbParams {
   ckbAddress: string;
   sporeTypeArgs: string;
+  /** The CCC signer (must be a BTC signer for leap-to-ckb) */
+  signer?: import('@ckb-ccc/core').ccc.Signer;
+  /** The CKB client instance */
+  client?: import('@ckb-ccc/core').ccc.Client;
 }
 
 /** Navigation view */
