@@ -3,74 +3,78 @@
 @tailwind utilities;
 
 /* ============================================================
-   RGB++ Pulse — Spotify-Inspired Design System
+   RGB++ Pulse — MetaMask Portfolio Inspired Design System
+   Deep blue + Orange accent
    ============================================================ */
 
 @layer base {
   :root {
-    /* shadcn/ui tokens mapped to Spotify colors */
-    --background: 0 0% 7%; /* #121212 */
-    --foreground: 0 0% 100%; /* #ffffff */
+    /* MetaMask Portfolio color scheme */
+    --background: 222 47% 6%; /* #0d1117 deep blue-black */
+    --foreground: 210 40% 98%; /* #f8fafc */
     
-    --card: 0 0% 9%; /* #181818 */
-    --card-foreground: 0 0% 100%;
+    --card: 222 47% 9%; /* #141d2b */
+    --card-foreground: 210 40% 98%;
     
-    --popover: 0 0% 15%; /* #252525 */
-    --popover-foreground: 0 0% 100%;
+    --popover: 222 47% 12%; /* #1c2839 */
+    --popover-foreground: 210 40% 98%;
     
-    --primary: 141 76% 48%; /* #1ed760 green */
-    --primary-foreground: 0 0% 0%; /* black text on green */
+    --primary: 25 95% 53%; /* #f97316 MetaMask orange */
+    --primary-foreground: 0 0% 100%;
     
-    --secondary: 0 0% 12%; /* #1f1f1f */
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 222 47% 14%; /* #1e2a3b */
+    --secondary-foreground: 210 40% 98%;
     
-    --muted: 0 0% 12%; /* #1f1f1f */
-    --muted-foreground: 0 0% 70%; /* #b3b3b3 */
+    --muted: 222 47% 14%; /* #1e2a3b */
+    --muted-foreground: 215 20% 55%; /* #7c8898 */
     
-    --accent: 0 0% 17%; /* #2a2a2a */
-    --accent-foreground: 0 0% 100%;
+    --accent: 222 47% 18%; /* #253349 */
+    --accent-foreground: 210 40% 98%;
     
-    --destructive: 354 74% 53%; /* #f3727f */
+    --destructive: 0 84% 60%; /* #ef4444 */
     --destructive-foreground: 0 0% 100%;
     
-    --warning: 32 100% 58%; /* #ffa42b */
+    --warning: 38 92% 50%; /* #f59e0b */
     --warning-foreground: 0 0% 0%;
     
-    --info: 213 88% 64%; /* #539df5 */
-    --info-foreground: 0 0% 0%;
+    --success: 142 76% 36%; /* #16a34a */
+    --success-foreground: 0 0% 100%;
     
-    --border: 0 0% 30%; /* #4d4d4d */
-    --input: 0 0% 30%;
-    --ring: 141 76% 48%; /* green */
+    --info: 199 89% 48%; /* #0ea5e9 */
+    --info-foreground: 0 0% 100%;
     
-    --radius: 0.5rem;
+    --border: 222 30% 20%; /* #2a3a4d */
+    --input: 222 30% 20%;
+    --ring: 25 95% 53%; /* orange */
+    
+    --radius: 0.75rem;
 
     /* Legacy variables for backward compatibility */
-    --green: #1ed760;
-    --green-border: #1db954;
-    --green-hover: #1fdf64;
-    --green-pressed: #169c46;
-    --bg-base: #121212;
-    --bg-surface: #181818;
-    --bg-elevated: #1f1f1f;
-    --bg-card: #252525;
-    --bg-card-alt: #272727;
-    --bg-highlight: #2a2a2a;
-    --text-base: #ffffff;
-    --text-secondary: #b3b3b3;
-    --text-bright: #cbcbcb;
-    --text-max: #fdfdfd;
-    --text-muted: #6a6a6a;
-    --text-negative: #f3727f;
-    --text-warning: #ffa42b;
-    --text-announcement: #539df5;
-    --text-positive: #1ed760;
-    --border-default: #4d4d4d;
-    --border-light: #7c7c7c;
-    --border-separator: #333333;
-    --shadow-heavy: rgba(0, 0, 0, 0.5) 0px 8px 24px;
-    --shadow-medium: rgba(0, 0, 0, 0.3) 0px 8px 8px;
-    --shadow-inset: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
+    --green: #16a34a;
+    --green-border: #15803d;
+    --green-hover: #22c55e;
+    --green-pressed: #14532d;
+    --bg-base: #0d1117;
+    --bg-surface: #141d2b;
+    --bg-elevated: #1c2839;
+    --bg-card: #1e2a3b;
+    --bg-card-alt: #253349;
+    --bg-highlight: #2d3f56;
+    --text-base: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-bright: #e2e8f0;
+    --text-max: #ffffff;
+    --text-muted: #64748b;
+    --text-negative: #ef4444;
+    --text-warning: #f59e0b;
+    --text-announcement: #0ea5e9;
+    --text-positive: #16a34a;
+    --border-default: #2a3a4d;
+    --border-light: #3d5168;
+    --border-separator: #1e2a3b;
+    --shadow-heavy: rgba(0, 0, 0, 0.6) 0px 8px 24px;
+    --shadow-medium: rgba(0, 0, 0, 0.4) 0px 8px 8px;
+    --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.15);
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --transition-fast: 150ms ease;
     --transition-normal: 250ms ease;
@@ -128,10 +132,47 @@
   background: var(--border-light);
 }
 
+/* --- Gradient Backgrounds --- */
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(222 47% 10%) 100%);
+}
+
+.gradient-card {
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(222 47% 7%) 100%);
+}
+
+.gradient-orange {
+  background: linear-gradient(135deg, hsl(25 95% 53%) 0%, hsl(32 95% 44%) 100%);
+}
+
+/* --- Glow Effects --- */
+.glow-orange {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.2), 0 0 40px rgba(249, 115, 22, 0.1);
+}
+
+.glow-border {
+  position: relative;
+}
+
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, transparent 50%, rgba(249, 115, 22, 0.1) 100%);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glow-border:hover::before {
+  opacity: 1;
+}
+
 /* --- Animations --- */
 @keyframes pipelinePulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 215, 96, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(30, 215, 96, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
 }
 
 @keyframes toastSlideIn {
@@ -139,50 +180,81 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
 /* --- DOB Trait Pills --- */
 .traits-grid {
-  @apply flex flex-wrap gap-1;
+  @apply flex flex-wrap gap-1.5;
 }
 
 .trait-pill {
-  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[0.5625rem] leading-snug transition-colors duration-150;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.625rem] leading-snug transition-all duration-200;
+  background: hsl(var(--accent));
+  border: 1px solid hsl(var(--border));
   max-width: 100%;
   overflow: hidden;
 }
 
 .trait-pill:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: hsl(var(--accent) / 0.8);
+  border-color: hsl(var(--primary) / 0.3);
+  transform: translateY(-1px);
 }
 
 .trait-pill-label {
   @apply text-muted-foreground font-medium whitespace-nowrap flex-shrink-0;
-  color: var(--text-muted);
 }
 
 .trait-pill-value {
-  @apply font-semibold whitespace-nowrap overflow-hidden text-ellipsis;
-  color: var(--text-secondary);
+  @apply font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-foreground;
 }
 
 /* --- DOB Detail Trait Rows --- */
 .detail-trait-row {
-  @apply flex items-center justify-between gap-3 px-4 py-2.5 transition-colors duration-150;
+  @apply flex items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 rounded-lg;
 }
 
 .detail-trait-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: hsl(var(--accent) / 0.5);
 }
 
 .detail-trait-name {
-  @apply text-xs font-medium whitespace-nowrap flex-shrink-0;
-  color: var(--text-muted);
+  @apply text-xs font-medium whitespace-nowrap flex-shrink-0 text-muted-foreground;
 }
 
 .detail-trait-value {
   @apply text-xs font-semibold text-right overflow-hidden text-ellipsis whitespace-nowrap min-w-0 text-foreground;
+}
+
+/* --- Card Styles --- */
+.asset-card {
+  @apply rounded-xl border border-border bg-card p-4 transition-all duration-200;
+}
+
+.asset-card:hover {
+  @apply border-primary/30 shadow-lg;
+  transform: translateY(-2px);
+}
+
+/* --- Stat Cards --- */
+.stat-card {
+  @apply rounded-xl border border-border bg-card/50 backdrop-blur p-5;
+}
+
+.stat-card-value {
+  @apply text-2xl font-bold text-foreground;
+}
+
+.stat-card-label {
+  @apply text-sm text-muted-foreground mt-1;
 }
 
 /* details/summary arrow override */

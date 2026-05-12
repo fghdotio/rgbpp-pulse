@@ -26,17 +26,20 @@ export default function App() {
   useTransactionRecovery();
 
   return (
-    <div className="flex w-full min-h-screen">
+    <div className="flex w-full min-h-screen gradient-bg">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="flex items-center justify-end px-6 py-4 border-b border-border bg-background sticky top-0 z-50">
+        <header className="flex items-center justify-between px-8 py-4 border-b border-border bg-card/30 backdrop-blur-md sticky top-0 z-50">
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          </div>
           <WalletConnect />
         </header>
 
         {/* Main content */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-8 overflow-auto">
           <ViewRouter />
         </main>
       </div>

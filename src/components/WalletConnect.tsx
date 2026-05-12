@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 
 /**
  * Determines if an address is BTC-like based on common prefixes.
@@ -24,9 +23,14 @@ function isBtcLike(addr: string): boolean {
  */
 function ChainBadge({ chain }: { chain: 'ckb' | 'btc' }) {
   return (
-    <Badge variant={chain === 'btc' ? 'warning' : 'info'} className="text-[0.5625rem] py-0.5 px-1.5">
+    <span className={cn(
+      "text-[0.5625rem] py-0.5 px-2 rounded font-semibold uppercase tracking-wide",
+      chain === 'btc' 
+        ? "bg-orange-500/10 text-orange-500" 
+        : "bg-cyan-400/10 text-cyan-400"
+    )}>
       {chain.toUpperCase()}
-    </Badge>
+    </span>
   );
 }
 
@@ -56,7 +60,7 @@ function AddressRow({ chain, address, onNotify }: {
   };
 
   return (
-    <div className="flex items-center gap-2 py-1.5">
+    <div className="flex items-center gap-3 py-2.5 px-1 rounded-lg hover:bg-accent/30 transition-colors">
       <ChainBadge chain={chain} />
 
       {/* Clickable address to explorer */}
@@ -76,13 +80,13 @@ function AddressRow({ chain, address, onNotify }: {
         onClick={handleCopy}
         title="Copy full address"
         className={cn(
-          "flex items-center justify-center w-6 h-6 rounded-full transition-all duration-150 flex-shrink-0",
+          "flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150 flex-shrink-0",
           copied 
-            ? "text-primary" 
+            ? "text-primary bg-primary/10" 
             : "text-muted-foreground hover:text-foreground hover:bg-accent"
         )}
       >
-        {copied ? <Check size={12} /> : <Copy size={12} />}
+        {copied ? <Check size={14} /> : <Copy size={14} />}
       </button>
     </div>
   );
@@ -94,8 +98,8 @@ export function WalletConnect() {
 
   if (!isConnected) {
     return (
-      <Button onClick={openConnector} className="gap-2 uppercase tracking-wide">
-        <Wallet size={16} />
+      <Button onClick={openConnector} className="gap-2 font-semibold">
+        <Wallet size={18} />
         Connect Wallet
       </Button>
     );
@@ -111,12 +115,12 @@ export function WalletConnect() {
   return (
     <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="pill" className="gap-2 font-semibold text-[0.8125rem]">
+        <Button variant="outline" className="gap-2.5 font-semibold text-sm px-4 py-2 h-auto border-border/50 hover:border-primary/30 hover:bg-accent/30">
           {/* Live indicator */}
-          <div className="w-[7px] h-[7px] rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))] flex-shrink-0" />
+          <div className="w-2 h-2 rounded-full bg-success shadow-[0_0_8px_hsl(var(--success))]" />
 
           {/* Primary address */}
-          <span className="font-mono text-[0.8125rem]">
+          <span className="font-mono text-sm">
             {typeof displayAddr === 'string' && displayAddr.length > 12
               ? formatAddress(displayAddr, 5, 4)
               : displayAddr}
@@ -125,33 +129,33 @@ export function WalletConnect() {
           <ChevronDown
             size={14}
             className={cn(
-              "transition-transform duration-200 opacity-50",
+              "transition-transform duration-200 text-muted-foreground",
               dropdownOpen && "rotate-180"
             )}
           />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="min-w-[320px] p-4">
+      <DropdownMenuContent align="end" className="min-w-[340px] p-5 bg-card border-border/50">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider">
-            Connected Addresses
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Connected Wallet
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); disconnect(); setDropdownOpen(false); }}
             title="Disconnect wallet"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[0.6875rem] font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150"
           >
-            <LogOut size={12} />
+            <LogOut size={14} />
             Disconnect
           </button>
         </div>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="bg-border/50 -mx-5 my-3" />
 
         {/* Address rows */}
-        <div className="flex flex-col gap-0.5 py-2">
+        <div className="flex flex-col gap-1">
           {walletAddress && (
             <AddressRow
               chain={isBtcLike(walletAddress) ? 'btc' : 'ckb'}
@@ -167,19 +171,19 @@ export function WalletConnect() {
             />
           )}
           {!walletAddress && !btcAddress && (
-            <div className="py-2 text-[0.8125rem] text-muted-foreground">
+            <div className="py-3 text-sm text-muted-foreground text-center">
               No address resolved
             </div>
           )}
         </div>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="bg-border/50 -mx-5 my-3" />
 
-        {/* Testnet indicator */}
-        <div className="flex items-center gap-1.5 pt-2">
-          <div className="w-[5px] h-[5px] rounded-full bg-warning" />
-          <span className="text-[0.625rem] text-muted-foreground uppercase tracking-wider">
-            Testnet
+        {/* Network indicator */}
+        <div className="flex items-center gap-2 px-1">
+          <div className="w-2 h-2 rounded-full bg-warning animate-pulse" />
+          <span className="text-[0.6875rem] text-muted-foreground font-medium">
+            Connected to Testnet
           </span>
         </div>
       </DropdownMenuContent>
