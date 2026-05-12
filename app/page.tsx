@@ -7,7 +7,7 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 export default function DashboardPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
