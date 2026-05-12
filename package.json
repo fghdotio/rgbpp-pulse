@@ -11,12 +11,12 @@
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "1.1.1",
-    "@ckb-ccc/connector-react": "workspace:*",
-    "@ckb-ccc/core": "workspace:*",
+    "@ckb-ccc/connector-react": "file:./vendor/ckb-ccc-connector-react-1.0.33.tgz",
+    "@ckb-ccc/core": "file:./vendor/ckb-ccc-core-1.12.4.tgz",
     "@ckb-ccc/dob-render": "0.0.0-canary-20251012152410",
-    "@ckb-ccc/rgbpp": "workspace:*",
-    "@ckb-ccc/shell": "workspace:*",
-    "@ckb-ccc/udt": "workspace:*",
+    "@ckb-ccc/rgbpp": "file:./vendor/ckb-ccc-rgbpp-1.0.0.tgz",
+    "@ckb-ccc/shell": "file:./vendor/ckb-ccc-shell-1.1.24.tgz",
+    "@ckb-ccc/udt": "file:./vendor/ckb-ccc-udt-0.1.23.tgz",
     "bitcoinjs-lib": "7.0.1",
     "buffer": "^6.0.3",
     "ecpair": "3.0.1",
@@ -41,5 +41,28 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "@ckb-ccc/core": "file:./vendor/ckb-ccc-core-1.12.4.tgz",
+      "@ckb-ccc/connector": "file:./vendor/ckb-ccc-connector-1.0.32.tgz",
+      "@ckb-ccc/connector-react": "file:./vendor/ckb-ccc-connector-react-1.0.33.tgz",
+      "@ckb-ccc/ccc": "file:./vendor/ckb-ccc-ccc-1.1.24.tgz",
+      "@ckb-ccc/rgbpp": "file:./vendor/ckb-ccc-rgbpp-1.0.0.tgz",
+      "@ckb-ccc/shell": "file:./vendor/ckb-ccc-shell-1.1.24.tgz",
+      "@ckb-ccc/udt": "file:./vendor/ckb-ccc-udt-0.1.23.tgz",
+      "@ckb-ccc/spore": "file:./vendor/ckb-ccc-spore-1.5.16.tgz",
+      "@ckb-ccc/did-ckb": "file:./vendor/ckb-ccc-did-ckb-0.0.0.tgz",
+      "@ckb-ccc/ssri": "file:./vendor/ckb-ccc-ssri-0.2.21.tgz",
+      "@ckb-ccc/type-id": "file:./vendor/ckb-ccc-type-id-0.0.0.tgz",
+      "@ckb-ccc/eip6963": "file:./vendor/ckb-ccc-eip6963-1.0.31.tgz",
+      "@ckb-ccc/joy-id": "file:./vendor/ckb-ccc-joy-id-1.0.31.tgz",
+      "@ckb-ccc/nip07": "file:./vendor/ckb-ccc-nip07-1.0.31.tgz",
+      "@ckb-ccc/okx": "file:./vendor/ckb-ccc-okx-1.0.31.tgz",
+      "@ckb-ccc/rei": "file:./vendor/ckb-ccc-rei-1.0.31.tgz",
+      "@ckb-ccc/uni-sat": "file:./vendor/ckb-ccc-uni-sat-1.0.31.tgz",
+      "@ckb-ccc/utxo-global": "file:./vendor/ckb-ccc-utxo-global-1.0.31.tgz",
+      "@ckb-ccc/xverse": "file:./vendor/ckb-ccc-xverse-1.0.31.tgz"
+    }
   }
 }

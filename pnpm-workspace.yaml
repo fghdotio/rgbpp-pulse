@@ -1,3 +1,2 @@
 packages:
   - "."
-  - ".scratch/fghdotio-ccc/packages/*"
