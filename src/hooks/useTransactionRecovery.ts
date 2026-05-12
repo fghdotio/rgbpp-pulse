@@ -58,10 +58,18 @@ export function useTransactionRecovery() {
   const { client, signer } = useApp();
   const recoveredRef = useRef<Set<string>>(new Set());
 
+  // Keep latest values in refs so the recovery effect can read them without re-triggering.
+  const pipelinesRef = useRef(pipelines);
+  const upsertRef = useRef(upsertPipeline);
+  useEffect(() => {
+    pipelinesRef.current = pipelines;
+    upsertRef.current = upsertPipeline;
+  });
+
   useEffect(() => {
     if (!client) return;
 
-    const activePipelines = pipelines.filter((p) => p.status === 'active');
+    const activePipelines = pipelinesRef.current.filter((p) => p.status === 'active');
     if (activePipelines.length === 0) return;
 
     // Partition pipelines into those needing sequential recovery (wallet signing)
@@ -121,13 +129,13 @@ export function useTransactionRecovery() {
           try {
             switch (operation) {
               case 'transfer-on-btc':
-                await resumeUdtTransferOnBtc(checkpoint, pipeline, btcSigner, client, upsertPipeline);
+                await resumeUdtTransferOnBtc(checkpoint, pipeline, btcSigner, client, upsertRef.current);
                 break;
               case 'leap-to-ckb':
-                await resumeUdtLeapToCkb(checkpoint, pipeline, btcSigner, client, upsertPipeline);
+                await resumeUdtLeapToCkb(checkpoint, pipeline, btcSigner, client, upsertRef.current);
                 break;
               default:
-                await resumeUdtLeapToBtc(checkpoint, pipeline, btcSigner, client, upsertPipeline);
+                await resumeUdtLeapToBtc(checkpoint, pipeline, btcSigner, client, upsertRef.current);
                 break;
             }
           } catch (err) {
@@ -146,7 +154,7 @@ export function useTransactionRecovery() {
           ? { ...s, status: 'error' as const, error: reason, timestamp: Date.now() }
           : s,
       );
-      upsertPipeline({ ...pipeline, steps, status: 'error' });
+      upsertRef.current({ ...pipeline, steps, status: 'error' });
     }
 
     async function resumeCkbConfirmation(pipeline: TransactionPipeline, txHash: string) {
@@ -161,7 +169,7 @@ export function useTransactionRecovery() {
           ...steps[confirmStepIdx],
           detail: 'Resuming after page refresh...',
         };
-        upsertPipeline({ ...pipeline, steps });
+        upsertRef.current({ ...pipeline, steps });
 
         await client!.waitTransaction(txHash);
 
@@ -174,7 +182,7 @@ export function useTransactionRecovery() {
           timestamp: Date.now(),
           detail: undefined,
         };
-        upsertPipeline({
+        upsertRef.current({
           ...pipeline,
           steps: doneSteps,
           status: 'completed',
@@ -196,7 +204,7 @@ export function useTransactionRecovery() {
             timestamp: Date.now(),
           };
         }
-        upsertPipeline({ ...pipeline, steps: errorSteps, status: 'error' });
+        upsertRef.current({ ...pipeline, steps: errorSteps, status: 'error' });
       }
     }
   }, [client, signer]); // Re-run when client or signer becomes available

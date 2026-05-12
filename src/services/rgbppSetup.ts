@@ -12,13 +12,17 @@ import { ccc } from '@ckb-ccc/core';
 const BTC_ASSETS_API_URL = 'https://api-testnet.rgbpp.com';
 
 /**
+ * Lazily import the @ckb-ccc/rgbpp barrel.
+ */
+function loadRgbppModule() {
+  return import('@ckb-ccc/rgbpp');
+}
+
+/**
  * Lazily create a BtcAssetsApi data source.
  */
 async function loadBtcDataSource() {
-  const { BtcAssetsApi } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/data-source/btc-assets-api'
-  );
+  const { BtcAssetsApi } = await loadRgbppModule();
   return new BtcAssetsApi({
     url: BTC_ASSETS_API_URL,
     isMainnet: false,
@@ -29,14 +33,7 @@ async function loadBtcDataSource() {
  * Lazily create an RgbppUdtClient.
  */
 async function loadRgbppUdtClient(ckbClient: ccc.Client) {
-  const { RgbppUdtClient } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/udt/client'
-  );
-  const { ClientScriptProvider } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/script/provider'
-  );
+  const { RgbppUdtClient, ClientScriptProvider } = await loadRgbppModule();
   return new RgbppUdtClient(ckbClient, new ClientScriptProvider(ckbClient));
 }
 
@@ -44,10 +41,7 @@ async function loadRgbppUdtClient(ckbClient: ccc.Client) {
  * Lazily create a RgbppBrowserBtcWallet for the connected BTC signer.
  */
 async function loadBrowserBtcWallet(btcSigner: ccc.SignerBtc) {
-  const { createRgbppBrowserBtcWallet, buildNetworkConfig, PredefinedNetwork } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/barrel'
-  );
+  const { createRgbppBrowserBtcWallet, buildNetworkConfig, PredefinedNetwork } = await loadRgbppModule();
   const networkConfig = buildNetworkConfig(PredefinedNetwork.BitcoinTestnet3);
   const dataSource = await loadBtcDataSource();
   return createRgbppBrowserBtcWallet(btcSigner, networkConfig, dataSource);
@@ -68,18 +62,7 @@ export async function createBrowserBtcWallet(btcSigner: ccc.SignerBtc) {
  * Required for transfer-on-btc and leap-to-ckb operations.
  */
 export async function createUnlockSigner(ckbClient: ccc.Client, btcAddress: string) {
-  const { CkbRgbppUnlockSigner } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/signer/index'
-  );
-  const { ScriptManager } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/script/manager'
-  );
-  const { ClientScriptProvider } = await import(
-    /* @vite-ignore */
-    '../../.scratch/fghdotio-ccc/packages/rgbpp/src/script/provider'
-  );
+  const { CkbRgbppUnlockSigner, ScriptManager, ClientScriptProvider } = await loadRgbppModule();
   const dataSource = await loadBtcDataSource();
   const scriptManager = new ScriptManager(new ClientScriptProvider(ckbClient));
   const scriptInfos = await scriptManager.getRgbppScriptInfos();
