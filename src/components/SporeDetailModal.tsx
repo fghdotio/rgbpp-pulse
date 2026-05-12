@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { SporeAsset, RgbppOperation } from '../services/types';
 import type { DobTrait } from '../services/dob';
 import { getDisplayTraits, isImageUri, extractImage } from '../services/dob';
-import { locationBadge, actionButton } from './AssetCard';
+import { LocationBadge } from './AssetCard';
+import { Button } from '@/components/ui/button';
 import { DobImage } from './DobImage';
 import {
   X, Gem, ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
@@ -207,7 +208,7 @@ export function SporeDetailModal({ asset, onClose, onAction }: SporeDetailModalP
             <span style={{ fontWeight: 700, fontSize: '1rem' }}>
               {asset.clusterName || 'DOB'}
             </span>
-            {locationBadge(asset.location)}
+            <LocationBadge location={asset.location} />
             {dobVersion !== null && (
               <span style={{
                 padding: '2px 8px', borderRadius: '4px', fontSize: '0.625rem',
@@ -356,9 +357,24 @@ export function SporeDetailModal({ asset, onClose, onAction }: SporeDetailModalP
           padding: '16px 20px', borderTop: '1px solid var(--border-separator)',
           display: 'flex', flexWrap: 'wrap', gap: '8px',
         }}>
-          {asset.location === 'ckb' && actionButton('Leap to BTC', <ArrowUpRight size={12} />, () => onAction('leap-to-btc'))}
-          {asset.location === 'btc' && actionButton('Transfer', <ArrowLeftRight size={12} />, () => onAction('transfer-on-btc'))}
-          {asset.location === 'btc' && actionButton('Leap to CKB', <ArrowDownLeft size={12} />, () => onAction('leap-to-ckb'))}
+          {asset.location === 'ckb' && (
+            <Button variant="outline" size="sm" onClick={() => onAction('leap-to-btc')} className="text-[0.6875rem] h-7 rounded-full">
+              <ArrowUpRight size={12} />
+              Leap to BTC
+            </Button>
+          )}
+          {asset.location === 'btc' && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => onAction('transfer-on-btc')} className="text-[0.6875rem] h-7 rounded-full">
+                <ArrowLeftRight size={12} />
+                Transfer
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onAction('leap-to-ckb')} className="text-[0.6875rem] h-7 rounded-full">
+                <ArrowDownLeft size={12} />
+                Leap to CKB
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
