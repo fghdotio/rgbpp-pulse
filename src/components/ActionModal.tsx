@@ -1,7 +1,20 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { RgbppOperation, UdtAsset } from '../services/types';
 import { formatAmount } from '../utils/format';
-import { X, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface Props {
   isOpen: boolean;
@@ -35,20 +48,12 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       title={copied ? 'Copied!' : 'Copy'}
-      style={{
-        background: copied ? 'rgba(30, 215, 96, 0.15)' : 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '4px',
-        padding: '3px 6px',
-        cursor: 'pointer',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '3px',
-        color: copied ? 'var(--green)' : 'var(--text-muted)',
-        fontSize: '0.5625rem',
-        fontWeight: 600,
-        transition: 'all 150ms ease',
-      }}
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.5625rem] font-semibold transition-all duration-150 border",
+        copied
+          ? "bg-primary/15 border-primary/20 text-primary"
+          : "bg-accent/50 border-border text-muted-foreground hover:text-foreground"
+      )}
     >
       {copied ? <Check size={9} /> : <Copy size={9} />}
       {copied ? 'Copied' : 'Copy'}
@@ -60,8 +65,6 @@ export function ActionModal({ isOpen, onClose, assetType, operation, assetName, 
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-
-  if (!isOpen) return null;
 
   const meta = opMeta[operation];
   const needsAmount = assetType === 'udt';
@@ -80,108 +83,66 @@ export function ActionModal({ isOpen, onClose, assetType, operation, assetName, 
     }, 500);
   };
 
+  const isValid = address && (!needsAmount || amount);
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--green)' }}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-primary">
               {meta.icon}
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{meta.label}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{assetName}</div>
+              <DialogTitle>{meta.label}</DialogTitle>
+              <DialogDescription className="text-xs">{assetName}</DialogDescription>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
-            <X size={20} />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Description */}
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+        <p className="text-[0.8125rem] text-muted-foreground leading-relaxed">
           {meta.desc}
         </p>
 
         {/* UDT Detail Card */}
         {udtInfo && (
-          <div
-            style={{
-              background: 'var(--bg-base)',
-              borderRadius: 'var(--radius-md)',
-              padding: '16px',
-              marginBottom: '20px',
-              border: '1px solid var(--border-separator)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--green) 0%, #0d9e42 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Coins size={16} color="#000" />
+          <div className="bg-background rounded-md p-4 border border-border">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0">
+                <Coins size={16} className="text-primary-foreground" />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{udtInfo.symbol}</div>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)' }}>{udtInfo.name}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[0.9375rem]">{udtInfo.symbol}</div>
+                <div className="text-[0.6875rem] text-muted-foreground">{udtInfo.name}</div>
               </div>
-              <span
-                style={{
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.5625rem',
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  background: udtInfo.location === 'btc' ? 'rgba(30, 215, 96, 0.12)' : 'rgba(83, 157, 245, 0.15)',
-                  color: udtInfo.location === 'btc' ? 'var(--green)' : 'var(--text-announcement)',
-                }}
-              >
+              <Badge variant={udtInfo.location === 'btc' ? 'default' : 'info'}>
                 {udtInfo.location === 'btc' ? 'RGB++' : 'CKB'}
-              </span>
+              </Badge>
             </div>
 
             {/* Info rows */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex flex-col gap-2">
               {/* Balance */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Balance</span>
-                <span style={{ fontSize: '1rem', fontWeight: 700 }}>
-                  {formatAmount(udtInfo.balance, udtInfo.decimals)} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-secondary)' }}>{udtInfo.symbol}</span>
+              <div className="flex justify-between items-baseline">
+                <span className="text-[0.6875rem] text-muted-foreground uppercase tracking-wide">Balance</span>
+                <span className="text-base font-bold">
+                  {formatAmount(udtInfo.balance, udtInfo.decimals)}{' '}
+                  <span className="text-xs font-normal text-muted-foreground">{udtInfo.symbol}</span>
                 </span>
               </div>
               {/* Decimals */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Decimals</span>
-                <span style={{ fontSize: '0.8125rem', fontFamily: 'monospace' }}>{udtInfo.decimals}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-[0.6875rem] text-muted-foreground uppercase tracking-wide">Decimals</span>
+                <span className="text-[0.8125rem] font-mono">{udtInfo.decimals}</span>
               </div>
               {/* Type Script Args */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Type Args</span>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[0.6875rem] text-muted-foreground uppercase tracking-wide">Type Args</span>
                   <CopyButton text={udtInfo.typeScriptArgs} />
                 </div>
-                <div
-                  style={{
-                    fontSize: '0.625rem',
-                    fontFamily: 'monospace',
-                    color: 'var(--text-secondary)',
-                    wordBreak: 'break-all',
-                    lineHeight: 1.5,
-                    background: 'rgba(255,255,255,0.02)',
-                    padding: '6px 8px',
-                    borderRadius: '4px',
-                  }}
-                >
+                <div className="text-[0.625rem] font-mono text-muted-foreground break-all leading-relaxed bg-accent/30 p-1.5 rounded">
                   {udtInfo.typeScriptArgs}
                 </div>
               </div>
@@ -189,41 +150,30 @@ export function ActionModal({ isOpen, onClose, assetType, operation, assetName, 
           </div>
         )}
 
-        <div className="divider" />
+        <Separator />
 
         {/* Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="flex flex-col gap-4">
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {operation === 'leap-to-ckb' ? 'CKB Address' : 'BTC Address'}
               </label>
               {myAddress && (
                 <button
                   onClick={() => setAddress(myAddress)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.625rem',
-                    fontWeight: 600,
-                    border: '1px solid var(--border-default)',
-                    background: address === myAddress ? 'rgba(30, 215, 96, 0.1)' : 'transparent',
-                    color: address === myAddress ? 'var(--green)' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    transition: 'all 150ms ease',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
-                  onMouseLeave={(e) => { if (address !== myAddress) { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-muted)'; } }}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.625rem] font-semibold border transition-all duration-150",
+                    address === myAddress
+                      ? "bg-primary/10 border-primary/30 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                  )}
                 >
                   My Address
                 </button>
               )}
             </div>
-            <input
-              className="input-dark"
+            <Input
               placeholder={operation === 'leap-to-ckb' ? 'ckt1q...' : 'tb1q...'}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -232,11 +182,10 @@ export function ActionModal({ isOpen, onClose, assetType, operation, assetName, 
 
           {needsAmount && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">
                 Amount
               </label>
-              <input
-                className="input-dark"
+              <Input
                 type="number"
                 placeholder="0.00"
                 value={amount}
@@ -246,32 +195,20 @@ export function ActionModal({ isOpen, onClose, assetType, operation, assetName, 
           )}
         </div>
 
-        <div className="divider" />
+        <Separator />
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            style={{ padding: '10px 20px', borderRadius: 'var(--radius-full)', background: 'var(--bg-elevated)', color: 'var(--text-base)', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}
-          >
+        <DialogFooter className="gap-2">
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSubmit}
-            disabled={!address || (needsAmount && !amount) || loading}
-            style={{
-              padding: '10px 24px', borderRadius: 'var(--radius-full)',
-              background: (!address || (needsAmount && !amount)) ? 'var(--bg-card)' : 'var(--green)',
-              color: (!address || (needsAmount && !amount)) ? 'var(--text-muted)' : '#000',
-              fontWeight: 700, fontSize: '0.875rem', border: 'none', cursor: 'pointer',
-              opacity: loading ? 0.6 : 1,
-              transition: 'all 150ms ease',
-            }}
+            disabled={!isValid || loading}
           >
             {loading ? 'Submitting...' : 'Confirm'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -8,7 +8,7 @@
  */
 import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
-import { getAddressAssets, getAssetTypeInfo, type RgbppCell } from './api';
+import { getAddressAssets, getAddressBalance, getAssetTypeInfo, type RgbppCell } from './api';
 import { batchDecodeDobs, renderDobToSvg } from './dob';
 
 /**
@@ -147,91 +147,22 @@ export async function fetchCkbUdtAssets(
 }
 
 /**
- * Fetch RGB++-bound UDT balances from the RGB++ API via the /assets endpoint.
- * Filters out Spore cells, parses LE u128 amounts from cell data,
- * aggregates by type script args, and enriches with token metadata.
+ * Fetch RGB++-bound UDT balances from the RGB++ API.
  */
 export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[]> {
   try {
-    const cells = await getAddressAssets(btcAddress);
-
-    // Filter for xUDT cells (has type script, is NOT a Spore cell)
-    const udtCells = cells.filter(
-      (cell) => cell.cellOutput.type && !isSporeCell(cell),
-    );
-
-    // Aggregate balances by type script args
-    const balanceMap = new Map<string, {
-      balance: bigint;
-      typeScript: { codeHash: string; args: string; hashType: string };
-    }>();
-
-    for (const cell of udtCells) {
-      const typeScript = cell.cellOutput.type!;
-      const key = typeScript.args;
-
-      // Parse LE u128 from first 16 bytes of cell data
-      let amount = BigInt(0);
-      const dataHex = (cell.data || '').startsWith('0x')
-        ? (cell.data || '').slice(2)
-        : (cell.data || '');
-      if (dataHex.length >= 32) {
-        const leBytes = dataHex.slice(0, 32);
-        const beBytes = leBytes.match(/.{2}/g)!.reverse().join('');
-        amount = BigInt('0x' + beBytes);
-      }
-
-      const existing = balanceMap.get(key);
-      if (existing) {
-        existing.balance += amount;
-      } else {
-        balanceMap.set(key, {
-          balance: amount,
-          typeScript: {
-            codeHash: typeScript.codeHash,
-            args: typeScript.args,
-            hashType: typeScript.hashType,
-          },
-        });
-      }
-    }
-
-    // Convert to UdtAsset array, enriching with metadata
-    const assets: UdtAsset[] = [];
-    for (const [, info] of balanceMap) {
-      let name = `xUDT ${info.typeScript.args.slice(0, 10)}...`;
-      let symbol = info.typeScript.args.slice(2, 8).toUpperCase();
-      let decimals = 8;
-
-      try {
-        const typeInfo = await getAssetTypeInfo({
-          codeHash: info.typeScript.codeHash,
-          args: info.typeScript.args,
-          hashType: info.typeScript.hashType as 'type' | 'data' | 'data1' | 'data2',
-        });
-        if (typeInfo && 'symbol' in typeInfo) {
-          name = typeInfo.name || name;
-          symbol = typeInfo.symbol || symbol;
-          decimals = typeInfo.decimal ?? decimals;
-        }
-      } catch {
-        // API lookup failed, use defaults
-      }
-
-      assets.push({
-        type: 'udt',
-        name,
-        symbol,
-        decimals,
-        balance: info.balance,
-        typeScriptArgs: info.typeScript.args,
-        typeScriptCodeHash: info.typeScript.codeHash,
-        typeScriptHashType: info.typeScript.hashType,
-        location: 'btc',
-      });
-    }
-
-    return assets;
+    const balance = await getAddressBalance(btcAddress);
+    return balance.xudt.map((x) => ({
+      type: 'udt' as const,
+      name: x.name || 'Unknown Token',
+      symbol: x.symbol || '???',
+      decimals: x.decimal,
+      balance: BigInt(x.total_amount || '0'),
+      typeScriptArgs: x.type_script.args,
+      typeScriptCodeHash: x.type_script.codeHash,
+      typeScriptHashType: x.type_script.hashType,
+      location: 'btc' as const,
+    }));
   } catch (err) {
     console.warn('Failed to fetch RGB++ UDT assets from API:', err);
     return [];
@@ -544,7 +475,7 @@ export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAs
  * then batch-decode DOB traits via the decoder server.
  */
 export async function fetchSporeAssets(
-  btcAddress: string | null,
+  _btcAddress: string | null,
   client?: ccc.Client,
   signer?: ccc.Signer,
 ): Promise<SporeAsset[]> {
@@ -556,11 +487,11 @@ export async function fetchSporeAssets(
     results.push(...ckbSpores);
   }
 
-  // RGB++-bound Spores via API
-  if (btcAddress) {
-    const rgbppSpores = await fetchRgbppSporeAssets(btcAddress);
-    results.push(...rgbppSpores);
-  }
+  // TODO: RGB++-bound Spores via API (temporarily disabled)
+  // if (btcAddress) {
+  //   const rgbppSpores = await fetchRgbppSporeAssets(btcAddress);
+  //   results.push(...rgbppSpores);
+  // }
 
   return results;
 }

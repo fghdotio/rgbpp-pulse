@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, X, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Toast {
   id: string;
@@ -45,64 +46,26 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '24px',
-        right: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        zIndex: 9999,
-        pointerEvents: 'none',
-      }}
-    >
+    <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-[9999] pointer-events-none">
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '12px 16px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border-default)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-            color: 'var(--text-base)',
-            fontSize: '0.8125rem',
-            fontWeight: 500,
-            pointerEvents: 'auto',
-            animation: 'toastSlideIn 300ms ease',
-            maxWidth: '400px',
-          }}
+          className={cn(
+            "flex items-center gap-2.5 px-4 py-3 rounded-md",
+            "bg-muted border border-border shadow-[0_8px_24px_rgba(0,0,0,0.4)]",
+            "text-foreground text-[0.8125rem] font-medium",
+            "pointer-events-auto animate-slide-up max-w-[400px]"
+          )}
         >
-          <CheckCircle size={16} color="var(--green)" style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>{toast.message}</span>
+          <CheckCircle size={16} className="text-primary flex-shrink-0" />
+          <span className="flex-1">{toast.message}</span>
           {toast.action && (
             <button
               onClick={() => {
                 toast.action!.onClick();
                 dismiss(toast.id);
               }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-full)',
-                background: 'rgba(30, 215, 96, 0.12)',
-                color: 'var(--green)',
-                fontSize: '0.6875rem',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 150ms ease',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(30, 215, 96, 0.2)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(30, 215, 96, 0.12)'; }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-[0.6875rem] font-bold whitespace-nowrap transition-all duration-150 hover:bg-primary/25 flex-shrink-0"
             >
               {toast.action.label}
               <ArrowRight size={11} />
@@ -110,14 +73,7 @@ export function ToastContainer() {
           )}
           <button
             onClick={() => dismiss(toast.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '2px',
-              flexShrink: 0,
-            }}
+            className="text-muted-foreground hover:text-foreground p-0.5 flex-shrink-0 transition-colors"
           >
             <X size={14} />
           </button>

@@ -1,8 +1,8 @@
-import React from 'react';
 import { useApp } from '../context/AppContext';
 import { useTransactions } from '../context/TransactionContext';
 import type { AppView } from '../services/types';
 import { LayoutDashboard, Coins, Gem, Activity, Zap } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [
   { view: 'portfolio', label: 'Portfolio', icon: <LayoutDashboard size={20} /> },
@@ -16,52 +16,22 @@ export function Sidebar() {
   const { activePipelines } = useTransactions();
 
   return (
-    <aside
-      style={{
-        width: '240px',
-        minHeight: '100vh',
-        background: 'var(--bg-base)',
-        borderRight: '1px solid var(--border-separator)',
-        padding: '24px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        flexShrink: 0,
-      }}
-    >
+    <aside className="w-60 min-h-screen bg-background border-r border-border p-6 flex flex-col gap-1 shrink-0">
       {/* Logo */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '8px 12px',
-          marginBottom: '24px',
-        }}
-      >
-        <div
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'var(--green)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Zap size={18} color="#000" />
+      <div className="flex items-center gap-2.5 px-3 py-2 mb-6">
+        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+          <Zap size={18} className="text-primary-foreground" />
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>RGB++</div>
-          <div style={{ fontSize: '0.625rem', color: 'var(--text-secondary)', fontWeight: 500, letterSpacing: '1px', textTransform: 'uppercase' }}>
+          <div className="font-bold text-base leading-tight">RGB++</div>
+          <div className="text-[0.625rem] text-muted-foreground font-medium tracking-wider uppercase">
             Asset Manager
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <nav className="flex flex-col gap-0.5">
         {navItems.map(({ view, label, icon }) => {
           const isActive = currentView === view;
           const hasActivity = view === 'transactions' && activePipelines.length > 0;
@@ -70,55 +40,17 @@ export function Sidebar() {
             <button
               key={view}
               onClick={() => setView(view)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '10px 12px',
-                borderRadius: 'var(--radius-md)',
-                background: isActive ? 'var(--bg-elevated)' : 'transparent',
-                color: isActive ? 'var(--text-base)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 700 : 400,
-                fontSize: '0.875rem',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'all 150ms ease',
-                width: '100%',
-                textAlign: 'left',
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.color = 'var(--text-base)';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                  e.currentTarget.style.background = 'transparent';
-                }
-              }}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md w-full text-left text-sm transition-all duration-150 relative",
+                isActive
+                  ? "bg-muted text-foreground font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
             >
               {icon}
               {label}
               {hasActivity && (
-                <span
-                  style={{
-                    marginLeft: 'auto',
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    background: 'var(--green)',
-                    color: '#000',
-                    fontSize: '0.625rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    animation: 'pulse 2s ease-in-out infinite',
-                  }}
-                >
+                <span className="ml-auto w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[0.625rem] font-bold flex items-center justify-center animate-pulse">
                   {activePipelines.length}
                 </span>
               )}
@@ -128,8 +60,8 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div style={{ marginTop: 'auto', padding: '12px', borderTop: '1px solid var(--border-separator)' }}>
-        <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+      <div className="mt-auto p-3 border-t border-border">
+        <div className="text-[0.625rem] text-muted-foreground uppercase tracking-wider">
           Testnet
         </div>
       </div>

@@ -1,8 +1,11 @@
-import React from 'react';
 import type { UdtAsset, SporeAsset } from '../services/types';
 import { formatAmount, formatAddress } from '../utils/format';
 import { DobImage } from './DobImage';
 import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Gem, FlaskConical } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface UdtCardProps {
   asset: UdtAsset;
@@ -15,238 +18,114 @@ interface SporeCardProps {
   onClick?: () => void;
 }
 
-export const locationBadge = (location: 'ckb' | 'btc') => (
-  <span
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      fontSize: '0.625rem',
-      fontWeight: 600,
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      background: location === 'btc' ? 'rgba(30, 215, 96, 0.12)' : 'rgba(83, 157, 245, 0.15)',
-      color: location === 'btc' ? 'var(--green)' : 'var(--text-announcement)',
-    }}
-  >
+export const LocationBadge = ({ location }: { location: 'ckb' | 'btc' }) => (
+  <Badge variant={location === 'btc' ? 'default' : 'info'} className="text-[0.625rem]">
     {location === 'btc' ? 'RGB++' : 'CKB'}
-  </span>
+  </Badge>
 );
 
-export const mockBadge = () => (
-  <span
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '3px',
-      padding: '2px 7px',
-      borderRadius: '4px',
-      fontSize: '0.5625rem',
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      letterSpacing: '0.8px',
-      background: 'rgba(255, 255, 255, 0.06)',
-      color: 'var(--text-muted)',
-      border: '1px dashed rgba(255, 255, 255, 0.1)',
-    }}
-  >
+export const MockBadge = () => (
+  <Badge variant="muted" className="text-[0.5625rem] gap-1 border border-dashed border-border">
     <FlaskConical size={9} />
     Mock
-  </span>
-);
-
-
-
-export const actionButton = (
-  label: string,
-  icon: React.ReactNode,
-  onClick: () => void,
-  color = 'var(--text-base)',
-) => (
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      onClick();
-    }}
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '6px 12px',
-      borderRadius: 'var(--radius-full)',
-      background: 'var(--bg-base)',
-      color,
-      fontSize: '0.6875rem',
-      fontWeight: 600,
-      border: '1px solid var(--border-default)',
-      cursor: 'pointer',
-      transition: 'all 150ms ease',
-      whiteSpace: 'nowrap',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.borderColor = 'var(--green)';
-      e.currentTarget.style.color = 'var(--green)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.borderColor = 'var(--border-default)';
-      e.currentTarget.style.color = color;
-    }}
-  >
-    {icon}
-    {label}
-  </button>
+  </Badge>
 );
 
 export function UdtCard({ asset, onAction }: UdtCardProps) {
   return (
-    <div
-      style={{
-        background: 'var(--bg-surface)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '20px',
-        transition: 'all 250ms ease',
-        cursor: 'default',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--bg-elevated)';
-        e.currentTarget.style.boxShadow = 'var(--shadow-medium)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'var(--bg-surface)';
-        e.currentTarget.style.boxShadow = 'none';
-        e.currentTarget.style.transform = 'translateY(0)';
-      }}
-    >
+    <Card className="p-5 transition-all duration-250 hover:bg-muted hover:shadow-lg hover:-translate-y-0.5">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-        <div
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--green) 0%, #0d9e42 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Coins size={20} color="#000" />
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0">
+          <Coins size={20} className="text-primary-foreground" />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>{asset.symbol}</span>
-            {locationBadge(asset.location)}
-            {asset.isMock && mockBadge()}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-bold text-base">{asset.symbol}</span>
+            <LocationBadge location={asset.location} />
+            {asset.isMock && <MockBadge />}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{asset.name}</div>
+          <div className="text-xs text-muted-foreground">{asset.name}</div>
         </div>
       </div>
 
       {/* Balance */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
+      <div className="mb-4">
+        <div className="text-2xl font-bold tracking-tight">
           {formatAmount(asset.balance, asset.decimals)}
         </div>
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-        {asset.location === 'ckb' && actionButton('Leap to BTC', <ArrowUpRight size={12} />, () => onAction('leap-to-btc'))}
-        {asset.location === 'btc' && actionButton('Transfer', <ArrowLeftRight size={12} />, () => onAction('transfer-on-btc'))}
-        {asset.location === 'btc' && actionButton('Leap to CKB', <ArrowDownLeft size={12} />, () => onAction('leap-to-ckb'))}
+      <div className="flex flex-wrap gap-1.5">
+        {asset.location === 'ckb' && (
+          <Button variant="outline" size="sm" onClick={() => onAction('leap-to-btc')} className="text-[0.6875rem] h-7 rounded-full">
+            <ArrowUpRight size={12} />
+            Leap to BTC
+          </Button>
+        )}
+        {asset.location === 'btc' && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => onAction('transfer-on-btc')} className="text-[0.6875rem] h-7 rounded-full">
+              <ArrowLeftRight size={12} />
+              Transfer
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onAction('leap-to-ckb')} className="text-[0.6875rem] h-7 rounded-full">
+              <ArrowDownLeft size={12} />
+              Leap to CKB
+            </Button>
+          </>
+        )}
       </div>
-    </div>
+    </Card>
   );
 }
 
 /**
  * SporeCard — compact card for the grid view.
- * Shows preview, name, ID. Clickable to open detail modal.
- * Traits and DOB info are shown in the detail modal, not here.
  */
 export function SporeCard({ asset, onClick }: SporeCardProps) {
   const dobName = asset.clusterName || 'DOB';
 
   return (
-    <div
+    <Card 
       onClick={onClick}
-      style={{
-        background: 'var(--bg-surface)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '16px',
-        transition: 'all 250ms ease',
-        cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--bg-elevated)';
-        e.currentTarget.style.boxShadow = 'var(--shadow-medium)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'var(--bg-surface)';
-        e.currentTarget.style.boxShadow = 'none';
-        e.currentTarget.style.transform = 'translateY(0)';
-      }}
+      className="p-4 transition-all duration-250 cursor-pointer hover:bg-muted hover:shadow-lg hover:-translate-y-0.5"
     >
       {/* Preview area */}
       <div
+        className={cn(
+          "w-full aspect-square rounded-md flex items-center justify-center mb-3 overflow-hidden relative",
+          !(asset.dobSvg || asset.dobImageUri) && "bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]"
+        )}
         style={{
-          width: '100%',
-          aspectRatio: '1',
-          borderRadius: 'var(--radius-md)',
-          background: (asset.dobSvg || asset.dobImageUri) ? 'var(--bg-base)' : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '12px',
-          overflow: 'hidden',
-          position: 'relative',
+          background: (asset.dobSvg || asset.dobImageUri) ? 'hsl(var(--background))' : undefined,
         }}
       >
         {/* Decoding shimmer */}
         {!asset.dobDecoded && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.03) 50%, transparent 75%)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 1.5s ease-in-out infinite',
-            }}
-          />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent bg-[length:200%_100%] animate-shimmer" />
         )}
         {(asset.dobSvg || asset.dobImageUri) ? (
           <DobImage svg={asset.dobSvg} uri={asset.dobImageUri} compact />
         ) : (
-          <Gem size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+          <Gem size={32} className="text-muted-foreground opacity-50" />
         )}
-        <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
-          {asset.isMock && mockBadge()}
-          {locationBadge(asset.location)}
+        <div className="absolute top-2 right-2 flex gap-1">
+          {asset.isMock && <MockBadge />}
+          <LocationBadge location={asset.location} />
         </div>
       </div>
 
       {/* Info */}
       <div>
-        <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '2px' }}>
+        <div className="font-semibold text-sm mb-0.5">
           {dobName}
         </div>
-        <div
-          style={{
-            fontSize: '0.6875rem',
-            color: 'var(--text-muted)',
-            fontFamily: 'monospace',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <div className="text-[0.6875rem] text-muted-foreground font-mono overflow-hidden text-ellipsis whitespace-nowrap">
           {formatAddress(asset.id, 8, 6)}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

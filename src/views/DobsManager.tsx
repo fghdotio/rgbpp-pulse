@@ -8,6 +8,11 @@ import { fetchSporeAssets, enrichSporesWithDob } from '../services/assets';
 import { sporeLeapToBtc, sporeTransferOnBtc, sporeLeapToCkb } from '../services/rgbpp';
 import type { RgbppOperation, SporeAsset } from '../services/types';
 import { Gem, Search, Loader2, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ClusterGroup {
   clusterId: string;
@@ -27,75 +32,46 @@ function ClusterSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div
-      style={{
-        background: 'var(--bg-surface)',
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Cluster header */}
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '14px 16px',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--text-base)',
-          textAlign: 'left',
-          transition: 'background 150ms ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >
-        <Layers size={14} color="var(--green)" />
-        <span style={{ fontWeight: 600, fontSize: '0.875rem', flex: 1 }}>
-          {group.clusterName}
-        </span>
-        <span
-          style={{
-            fontSize: '0.6875rem',
-            fontWeight: 600,
-            color: 'var(--text-muted)',
-            background: 'var(--bg-base)',
-            padding: '2px 8px',
-            borderRadius: '4px',
-          }}
-        >
-          {group.spores.length}
-        </span>
-        {open
-          ? <ChevronUp size={14} color="var(--text-muted)" />
-          : <ChevronDown size={14} color="var(--text-muted)" />}
-      </button>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card className="overflow-hidden">
+        {/* Cluster header */}
+        <CollapsibleTrigger asChild>
+          <button className="w-full flex items-center gap-2.5 px-4 py-3.5 bg-transparent text-foreground text-left transition-colors hover:bg-muted cursor-pointer">
+            <Layers size={14} className="text-primary" />
+            <span className="font-semibold text-sm flex-1">
+              {group.clusterName}
+            </span>
+            <span className="text-[0.6875rem] font-semibold text-muted-foreground bg-background px-2 py-0.5 rounded">
+              {group.spores.length}
+            </span>
+            {open
+              ? <ChevronUp size={14} className="text-muted-foreground" />
+              : <ChevronDown size={14} className="text-muted-foreground" />}
+          </button>
+        </CollapsibleTrigger>
 
-      {/* Spore grid (collapsible) */}
-      {open && (
-        <div style={{ padding: '0 16px 16px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
-            {group.spores.map((a) => (
-              <SporeCard
-                key={a.id}
-                asset={a}
-                onClick={() => onCardClick(a)}
-                onAction={() => {/* handled via detail modal */}}
-              />
-            ))}
+        {/* Spore grid (collapsible) */}
+        <CollapsibleContent>
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+              {group.spores.map((a) => (
+                <SporeCard
+                  key={a.id}
+                  asset={a}
+                  onClick={() => onCardClick(a)}
+                  onAction={() => {/* handled via detail modal */}}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
 /**
  * DOBs Manager — shows all DOBs/Spores grouped by Cluster.
- * Clicking a card opens a detail modal with DOB version, traits, and actions.
  */
 export function DobsManager() {
   const { isConnected, btcAddress, client, signer } = useApp();
@@ -160,7 +136,6 @@ export function DobsManager() {
         });
       }
     }
-    // Sort: named clusters first (alphabetical), unclustered last
     return [...map.values()].sort((a, b) => {
       if (a.clusterId === '__unclustered__') return 1;
       if (b.clusterId === '__unclustered__') return -1;
@@ -177,62 +152,70 @@ export function DobsManager() {
   const handleActionSubmit = async (params: { address: string }) => {
     if (!actionModal) return;
     const { op, asset } = actionModal;
-    if (op === 'leap-to-btc') await sporeLeapToBtc({ sporeTypeArgs: asset.id, signer, client }, upsertPipeline);
-    if (op === 'transfer-on-btc') await sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: asset.id }], signer, client }, upsertPipeline);
-    if (op === 'leap-to-ckb') await sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: asset.id, signer, client }, upsertPipeline);
+    if (op === 'leap-to-btc') await sporeLeapToBtc({ sporeTypeArgs: asset.id }, upsertPipeline);
+    if (op === 'transfer-on-btc') await sporeTransferOnBtc({ transfers: [{ btcAddress: params.address, sporeTypeArgs: asset.id }] }, upsertPipeline);
+    if (op === 'leap-to-ckb') await sporeLeapToCkb({ ckbAddress: params.address, sporeTypeArgs: asset.id }, upsertPipeline);
   };
 
   if (!isConnected) {
-    return <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Connect wallet to view DOBs</div>;
+    return <div className="p-12 text-center text-muted-foreground">Connect wallet to view DOBs</div>;
   }
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px', color: 'var(--text-secondary)', padding: '48px' }}>
-        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+      <div className="flex items-center justify-center flex-1 gap-3 text-muted-foreground p-12">
+        <Loader2 size={20} className="animate-spin" />
         Loading DOBs...
       </div>
     );
   }
 
   return (
-    <div style={{ animation: 'fadeIn 300ms ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-        <Gem size={22} color="var(--green)" />
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>DOBs</h1>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+    <div className="animate-fade-in">
+      <div className="flex items-center gap-2.5 mb-6">
+        <Gem size={22} className="text-primary" />
+        <h1 className="text-2xl font-bold">DOBs</h1>
+        <span className="text-xs text-muted-foreground">
           {filtered.length} items · {clusterGroups.length} {clusterGroups.length === 1 ? 'collection' : 'collections'}
           {decoding && (
-            <span style={{ marginLeft: '8px', color: 'var(--text-secondary)' }}>
-              <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle', marginRight: '4px' }} />
-              Decoding DOBs…
+            <span className="ml-2 text-muted-foreground">
+              <Loader2 size={11} className="animate-spin inline align-middle mr-1" />
+              Decoding DOBs...
             </span>
           )}
         </span>
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         {([['all', 'All'], ['ckb', 'CKB'], ['rgbpp', 'RGB++']] as const).map(([key, label]) => (
-          <button key={key} onClick={() => setFilter(key)} style={{
-            padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 600,
-            background: filter === key ? 'var(--text-base)' : 'var(--bg-elevated)',
-            color: filter === key ? '#000' : 'var(--text-secondary)',
-            border: 'none', cursor: 'pointer', letterSpacing: '0.5px', transition: 'all 150ms ease',
-          }}>
+          <Button
+            key={key}
+            variant={filter === key ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setFilter(key)}
+            className={cn(
+              "rounded-full text-xs font-semibold tracking-wide",
+              filter === key && "bg-foreground text-background hover:bg-foreground/90"
+            )}
+          >
             {label}
-          </button>
+          </Button>
         ))}
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input className="input-pill" placeholder="Search DOBs..." value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingLeft: '32px', width: '200px', fontSize: '0.75rem' }} />
+        <div className="ml-auto relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search DOBs..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 w-[200px] text-xs h-8"
+          />
         </div>
       </div>
 
       {/* Cluster groups */}
       {clusterGroups.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="flex flex-col gap-2">
           {clusterGroups.map((g) => (
             <ClusterSection
               key={g.clusterId}
@@ -243,7 +226,7 @@ export function DobsManager() {
           ))}
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No matching DOBs</div>
+        <div className="text-center p-10 text-muted-foreground">No matching DOBs</div>
       )}
 
       {/* Detail modal */}

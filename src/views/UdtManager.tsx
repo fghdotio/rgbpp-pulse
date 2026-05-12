@@ -8,6 +8,9 @@ import { fetchUdtAssets, getMockUdtAssets } from '../services/assets';
 import { udtLeapToBtc, udtTransferOnBtc, udtLeapToCkb } from '../services/rgbpp';
 import type { RgbppOperation, UdtAsset, TransactionPipeline } from '../services/types';
 import { Coins, Search, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 /**
  * UDT Manager — shows all UDTs (both CKB-native and RGB++-bound).
@@ -40,8 +43,7 @@ export function UdtManager() {
     const opLabel = op === 'leap-to-btc' ? 'Leap to BTC' : op === 'transfer-on-btc' ? 'Transfer on BTC' : 'Leap to CKB';
     const assetSymbol = asset.symbol;
 
-    // Wrap onUpdate to detect when the first broadcast step completes,
-    // then show the toast at that point instead of immediately.
+    // Wrap onUpdate to detect when the first broadcast step completes
     let toastShown = false;
     const onUpdate = (p: TransactionPipeline) => {
       upsertPipeline(p);
@@ -66,50 +68,58 @@ export function UdtManager() {
   };
 
   if (!isConnected) {
-    return <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Connect wallet to view UDT assets</div>;
+    return <div className="p-12 text-center text-muted-foreground">Connect wallet to view UDT assets</div>;
   }
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px', color: 'var(--text-secondary)', padding: '48px' }}>
-        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+      <div className="flex items-center justify-center flex-1 gap-3 text-muted-foreground p-12">
+        <Loader2 size={20} className="animate-spin" />
         Loading UDT assets...
       </div>
     );
   }
 
   return (
-    <div style={{ animation: 'fadeIn 300ms ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-        <Coins size={22} color="var(--green)" />
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>UDT</h1>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{filtered.length} assets</span>
+    <div className="animate-fade-in">
+      <div className="flex items-center gap-2.5 mb-6">
+        <Coins size={22} className="text-primary" />
+        <h1 className="text-2xl font-bold">UDT</h1>
+        <span className="text-xs text-muted-foreground">{filtered.length} assets</span>
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         {([['all', 'All'], ['ckb', 'CKB'], ['rgbpp', 'RGB++']] as const).map(([key, label]) => (
-          <button key={key} onClick={() => setFilter(key)} style={{
-            padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 600,
-            background: filter === key ? 'var(--text-base)' : 'var(--bg-elevated)',
-            color: filter === key ? '#000' : 'var(--text-secondary)',
-            border: 'none', cursor: 'pointer', letterSpacing: '0.5px', transition: 'all 150ms ease',
-          }}>
+          <Button
+            key={key}
+            variant={filter === key ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setFilter(key)}
+            className={cn(
+              "rounded-full text-xs font-semibold tracking-wide",
+              filter === key && "bg-foreground text-background hover:bg-foreground/90"
+            )}
+          >
             {label}
-          </button>
+          </Button>
         ))}
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input className="input-pill" placeholder="Search tokens..." value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingLeft: '32px', width: '200px', fontSize: '0.75rem' }} />
+        <div className="ml-auto relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search tokens..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 w-[200px] text-xs h-8"
+          />
         </div>
       </div>
 
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {filtered.map((a) => <UdtCard key={`${a.typeScriptArgs}-${a.location}`} asset={a} onAction={(op) => setModal({ op, asset: a })} />)}
       </div>
-      {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No matching UDT assets</div>}
+      {filtered.length === 0 && <div className="text-center p-10 text-muted-foreground">No matching UDT assets</div>}
 
       {modal && (
         <ActionModal isOpen onClose={() => setModal(null)} assetType="udt" operation={modal.op} assetName={modal.asset.symbol} udtInfo={modal.asset} ckbAddress={walletAddress ?? undefined} btcAddress={btcAddress ?? undefined} onSubmit={handleSubmit} />

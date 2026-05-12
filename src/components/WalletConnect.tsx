@@ -1,7 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatAddress, copyToClipboard, getCkbAddressExplorerUrl, getBtcAddressExplorerUrl } from '../utils/format';
 import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * Determines if an address is BTC-like based on common prefixes.
@@ -11,23 +20,13 @@ function isBtcLike(addr: string): boolean {
 }
 
 /**
- * Small chain icon badge.
+ * Small chain badge component.
  */
 function ChainBadge({ chain }: { chain: 'ckb' | 'btc' }) {
-  const colors = chain === 'btc'
-    ? { bg: 'rgba(255, 164, 43, 0.15)', color: '#ffa42b' }
-    : { bg: 'rgba(83, 157, 245, 0.15)', color: '#539df5' };
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '1px 6px', borderRadius: '3px',
-      fontSize: '0.5625rem', fontWeight: 700,
-      textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: '1.4',
-      background: colors.bg, color: colors.color,
-      flexShrink: 0,
-    }}>
-      {chain}
-    </span>
+    <Badge variant={chain === 'btc' ? 'warning' : 'info'} className="text-[0.5625rem] py-0.5 px-1.5">
+      {chain.toUpperCase()}
+    </Badge>
   );
 }
 
@@ -57,47 +56,31 @@ function AddressRow({ chain, address, onNotify }: {
   };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '8px',
-      padding: '6px 0',
-    }}>
+    <div className="flex items-center gap-2 py-1.5">
       <ChainBadge chain={chain} />
 
-      {/* Clickable address → explorer */}
+      {/* Clickable address to explorer */}
       <a
         href={explorerUrl}
         target="_blank"
         rel="noopener noreferrer"
         title={address}
-        style={{
-          flex: 1, minWidth: 0,
-          fontSize: '0.8125rem', fontFamily: 'monospace',
-          color: 'var(--text-secondary)',
-          textDecoration: 'none',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          transition: 'color 150ms ease',
-          display: 'flex', alignItems: 'center', gap: '4px',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--green)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+        className="flex-1 min-w-0 text-[0.8125rem] font-mono text-muted-foreground hover:text-primary transition-colors duration-150 overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-1"
       >
         {formatAddress(address, 8, 6)}
-        <ExternalLink size={10} style={{ flexShrink: 0, opacity: 0.6 }} />
+        <ExternalLink size={10} className="flex-shrink-0 opacity-60" />
       </a>
 
       {/* Copy button */}
       <button
         onClick={handleCopy}
         title="Copy full address"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: '24px', height: '24px', borderRadius: '50%',
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          color: copied ? 'var(--green)' : 'var(--text-muted)',
-          transition: 'all 150ms ease', flexShrink: 0,
-        }}
-        onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = 'var(--text-base)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-        onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+        className={cn(
+          "flex items-center justify-center w-6 h-6 rounded-full transition-all duration-150 flex-shrink-0",
+          copied 
+            ? "text-primary" 
+            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+        )}
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}
       </button>
@@ -108,38 +91,13 @@ function AddressRow({ chain, address, onNotify }: {
 export function WalletConnect() {
   const { isConnected, walletAddress, btcAddress, openConnector, disconnect, notify } = useApp();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [dropdownOpen]);
 
   if (!isConnected) {
     return (
-      <button
-        onClick={openConnector}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: '8px',
-          background: 'var(--green)', color: '#000',
-          padding: '10px 24px', borderRadius: 'var(--radius-full)',
-          fontWeight: 700, fontSize: '0.875rem',
-          border: 'none', cursor: 'pointer',
-          transition: 'all 150ms ease', letterSpacing: '0.14px',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-hover)'; e.currentTarget.style.transform = 'scale(1.04)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--green)'; e.currentTarget.style.transform = 'scale(1)'; }}
-      >
+      <Button onClick={openConnector} className="gap-2 uppercase tracking-wide">
         <Wallet size={16} />
-        CONNECT WALLET
-      </button>
+        Connect Wallet
+      </Button>
     );
   }
 
@@ -151,137 +109,80 @@ export function WalletConnect() {
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {/* Collapsed pill — click to toggle dropdown */}
-      <button
-        onClick={() => setDropdownOpen(!dropdownOpen)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: '8px',
-          background: dropdownOpen ? 'var(--bg-card)' : 'var(--bg-elevated)',
-          color: 'var(--text-base)',
-          padding: '8px 14px', borderRadius: 'var(--radius-full)',
-          fontWeight: 600, fontSize: '0.8125rem',
-          border: 'none', cursor: 'pointer',
-          transition: 'all 150ms ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-card)'; }}
-        onMouseLeave={(e) => { if (!dropdownOpen) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
-      >
-        {/* Live indicator */}
-        <div style={{
-          width: '7px', height: '7px', borderRadius: '50%',
-          background: 'var(--green)',
-          boxShadow: '0 0 6px var(--green)',
-          flexShrink: 0,
-        }} />
+    <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="pill" className="gap-2 font-semibold text-[0.8125rem]">
+          {/* Live indicator */}
+          <div className="w-[7px] h-[7px] rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))] flex-shrink-0" />
 
-        {/* Primary address */}
-        <span style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>
-          {typeof displayAddr === 'string' && displayAddr.length > 12
-            ? formatAddress(displayAddr, 5, 4)
-            : displayAddr}
-        </span>
+          {/* Primary address */}
+          <span className="font-mono text-[0.8125rem]">
+            {typeof displayAddr === 'string' && displayAddr.length > 12
+              ? formatAddress(displayAddr, 5, 4)
+              : displayAddr}
+          </span>
 
-        <ChevronDown
-          size={14}
-          style={{
-            transition: 'transform 200ms ease',
-            transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            opacity: 0.5,
-          }}
-        />
-      </button>
-
-      {/* Dropdown panel */}
-      {dropdownOpen && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 8px)', right: 0,
-          background: 'var(--bg-card)',
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid var(--border-separator)',
-          boxShadow: 'var(--shadow-heavy)',
-          padding: '16px',
-          minWidth: '320px',
-          maxWidth: 'calc(100vw - 32px)',
-          zIndex: 200,
-          animation: 'slideUp 200ms ease',
-        }}>
-          {/* Header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: '12px',
-          }}>
-            <span style={{
-              fontSize: '0.6875rem', fontWeight: 600,
-              color: 'var(--text-muted)',
-              textTransform: 'uppercase', letterSpacing: '1.2px',
-            }}>
-              Connected Addresses
-            </span>
-            <button
-              onClick={(e) => { e.stopPropagation(); disconnect(); setDropdownOpen(false); }}
-              title="Disconnect wallet"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: 'var(--radius-full)',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'var(--text-muted)', fontSize: '0.6875rem', fontWeight: 600,
-                transition: 'all 150ms ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-negative)'; e.currentTarget.style.background = 'rgba(243, 114, 127, 0.08)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
-            >
-              <LogOut size={12} />
-              Disconnect
-            </button>
-          </div>
-
-          {/* Divider */}
-          <div style={{ height: '1px', background: 'var(--border-separator)', margin: '0 0 10px' }} />
-
-          {/* Address rows */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {walletAddress && (
-              <AddressRow
-                chain={isBtcLike(walletAddress) ? 'btc' : 'ckb'}
-                address={walletAddress}
-                onNotify={handleNotify}
-              />
+          <ChevronDown
+            size={14}
+            className={cn(
+              "transition-transform duration-200 opacity-50",
+              dropdownOpen && "rotate-180"
             )}
-            {btcAddress && btcAddress !== walletAddress && (
-              <AddressRow
-                chain="btc"
-                address={btcAddress}
-                onNotify={handleNotify}
-              />
-            )}
-            {!walletAddress && !btcAddress && (
-              <div style={{ padding: '8px 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                No address resolved
-              </div>
-            )}
-          </div>
+          />
+        </Button>
+      </DropdownMenuTrigger>
 
-          {/* Testnet indicator */}
-          <div style={{
-            marginTop: '12px', paddingTop: '10px',
-            borderTop: '1px solid var(--border-separator)',
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}>
-            <div style={{
-              width: '5px', height: '5px', borderRadius: '50%',
-              background: 'var(--text-warning)',
-            }} />
-            <span style={{
-              fontSize: '0.625rem', color: 'var(--text-muted)',
-              textTransform: 'uppercase', letterSpacing: '1px',
-            }}>
-              Testnet
-            </span>
-          </div>
+      <DropdownMenuContent align="end" className="min-w-[320px] p-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider">
+            Connected Addresses
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); disconnect(); setDropdownOpen(false); }}
+            title="Disconnect wallet"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[0.6875rem] font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150"
+          >
+            <LogOut size={12} />
+            Disconnect
+          </button>
         </div>
-      )}
-    </div>
+
+        <DropdownMenuSeparator />
+
+        {/* Address rows */}
+        <div className="flex flex-col gap-0.5 py-2">
+          {walletAddress && (
+            <AddressRow
+              chain={isBtcLike(walletAddress) ? 'btc' : 'ckb'}
+              address={walletAddress}
+              onNotify={handleNotify}
+            />
+          )}
+          {btcAddress && btcAddress !== walletAddress && (
+            <AddressRow
+              chain="btc"
+              address={btcAddress}
+              onNotify={handleNotify}
+            />
+          )}
+          {!walletAddress && !btcAddress && (
+            <div className="py-2 text-[0.8125rem] text-muted-foreground">
+              No address resolved
+            </div>
+          )}
+        </div>
+
+        <DropdownMenuSeparator />
+
+        {/* Testnet indicator */}
+        <div className="flex items-center gap-1.5 pt-2">
+          <div className="w-[5px] h-[5px] rounded-full bg-warning" />
+          <span className="text-[0.625rem] text-muted-foreground uppercase tracking-wider">
+            Testnet
+          </span>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

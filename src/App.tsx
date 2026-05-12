@@ -1,4 +1,3 @@
-
 import { Sidebar } from './components/Sidebar';
 import { WalletConnect } from './components/WalletConnect';
 import { Notifications } from './components/Notifications';
@@ -27,29 +26,17 @@ export default function App() {
   useTransactionRecovery();
 
   return (
-    <div style={{ display: 'flex', width: '100%', minHeight: '100vh' }}>
+    <div className="flex w-full min-h-screen">
       <Sidebar />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            padding: '16px 24px',
-            borderBottom: '1px solid var(--border-separator)',
-            background: 'var(--bg-base)',
-            position: 'sticky',
-            top: 0,
-            zIndex: 100,
-          }}
-        >
+        <header className="flex items-center justify-end px-6 py-4 border-b border-border bg-background sticky top-0 z-50">
           <WalletConnect />
         </header>
 
         {/* Main content */}
-        <main style={{ flex: 1, padding: '24px', overflow: 'auto' }}>
+        <main className="flex-1 p-6 overflow-auto">
           <ViewRouter />
         </main>
       </div>
