@@ -478,6 +478,7 @@ export async function fetchCkbSporeAssets(
             content: '',
             clusterId,
             clusterName,
+            capacity: cell.cellOutput.capacity.toString(),
             location: 'ckb',
           });
         }
@@ -527,6 +528,7 @@ export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAs
         content: '',
         clusterId,
         clusterName,
+        capacity: cell.cellOutput.capacity,
         location: 'btc',
       });
     }

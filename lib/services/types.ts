@@ -37,6 +37,7 @@ export interface SporeAsset {
   clusterId?: string;
   clusterName?: string;
   location: AssetLocation;
+  capacity?: string;
   isMock?: boolean;
   dobTraits?: DobTrait[];
   dobContent?: Record<string, unknown>;

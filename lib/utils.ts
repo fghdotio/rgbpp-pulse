@@ -39,6 +39,34 @@ export function generateId(): string {
 }
 
 /**
+ * Get the first letter of a token symbol for avatar display.
+ */
+export function getTokenInitial(symbol?: string, name?: string): string {
+  return (symbol || name || "?")[0].toUpperCase();
+}
+
+/**
+ * Generate a deterministic HSL background color from a token symbol.
+ * Returns an object with `bg` (background) and `fg` (foreground text) CSS colors.
+ *
+ * Uses a simple djb2 hash → hue mapping with curated saturation & lightness
+ * so every token gets a unique, visually distinct avatar color.
+ */
+export function getTokenColor(symbol?: string, name?: string): { bg: string; fg: string } {
+  const raw = (symbol || name || "?").toUpperCase();
+  // djb2 hash
+  let hash = 5381;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) + hash + raw.charCodeAt(i)) | 0;
+  }
+  const hue = ((hash % 360) + 360) % 360;
+  return {
+    bg: `hsl(${hue} 55% 25%)`,
+    fg: `hsl(${hue} 70% 75%)`,
+  };
+}
+
+/**
  * Format a timestamp to relative time
  */
 export function formatRelativeTime(timestamp: number): string {

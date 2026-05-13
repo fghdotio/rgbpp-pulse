@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/lib/context/app-context";
-import { formatBalance, truncateAddress, cn } from "@/lib/utils";
+import { formatBalance, truncateAddress, cn, getTokenInitial, getTokenColor } from "@/lib/utils";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -247,9 +247,9 @@ export function TransactionDialog({
           {/* Token info card */}
           <div className="p-4 rounded-lg bg-muted/50 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-primary">
-                  {(token.symbol || token.name).slice(0, 2)}
+              <div className="size-10 rounded-full flex items-center justify-center" style={{ backgroundColor: getTokenColor(token.symbol, token.name).bg }}>
+                <span className="text-sm font-bold" style={{ color: getTokenColor(token.symbol, token.name).fg }}>
+                  {getTokenInitial(token.symbol, token.name)}
                 </span>
               </div>
               <div className="flex-1 min-w-0">

@@ -4,10 +4,17 @@ import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from "@/components/ui/dialog";
 import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
 import { truncateAddress } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownLeft, Image as ImageIcon, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Image as ImageIcon, Loader2, Copy, Check } from "lucide-react";
 import type { SporeAsset } from "@/lib/services/types";
 import { SporeTransactionDialog, type SporeDialogOperation } from "./spore-transaction-dialog";
 import type { DobChainFilter } from "@/lib/services/types";
@@ -21,11 +28,13 @@ export function DobGrid({ filter }: DobGridProps) {
   const { sporeAssets, loading, enrichingDobs } = useAssets();
 
   const filteredAssets = useMemo(() => {
-    if (filter === "all") return sporeAssets;
+    if (filter === "all") return [...sporeAssets].sort((a, b) => (a.location === "btc" ? -1 : 1) - (b.location === "btc" ? -1 : 1));
     if (filter === "rgbpp") return sporeAssets.filter((s) => s.location === "btc");
     return sporeAssets.filter((s) => s.location === "ckb");
   }, [sporeAssets, filter]);
-  const [selectedDob, setSelectedDob] = useState<SporeAsset | null>(null);
+
+  const [detailDob, setDetailDob] = useState<SporeAsset | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
   const [txDialogSpore, setTxDialogSpore] = useState<SporeAsset | null>(null);
   const [txDialogOp, setTxDialogOp] = useState<SporeDialogOperation>("leap-to-btc");
   const [txDialogOpen, setTxDialogOpen] = useState(false);
@@ -81,6 +90,8 @@ export function DobGrid({ filter }: DobGridProps) {
     );
   }
 
+  const visibleTraits = detailDob?.dobTraits?.filter((t) => !t.name.startsWith("prev.")) ?? [];
+
   return (
     <>
       {enrichingDobs && (
@@ -90,59 +101,155 @@ export function DobGrid({ filter }: DobGridProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* ── Card Grid ────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
         {filteredAssets.map((dob) => (
           <Card
             key={dob.id}
-            className={`overflow-hidden cursor-pointer transition-all hover:border-primary/50 ${selectedDob?.id === dob.id ? "border-primary ring-1 ring-primary" : ""}`}
-            onClick={() => setSelectedDob(dob)}
+            className="overflow-hidden transition-all hover:border-primary/50 hover:shadow-md"
           >
-            <div className="aspect-square bg-secondary/50 flex items-center justify-center relative">
-              {dob.dobSvg ? (
-                <div dangerouslySetInnerHTML={{ __html: dob.dobSvg }} className="w-full h-full" />
-              ) : dob.dobImageUri ? (
-                <img src={dob.dobImageUri} alt={dob.clusterName || "DOB"} className="w-full h-full object-cover" />
+            <div className="aspect-square bg-secondary/50 relative overflow-hidden cursor-pointer" onClick={() => setDetailDob(dob)}>
+              {(dob.dobSvg || dob.dobImageUri) ? (
+                <img
+                  src={dob.dobSvg
+                    ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(dob.dobSvg)}`
+                    : dob.dobImageUri!}
+                  alt={dob.clusterName || "DOB"}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
               ) : (
-                <div className="size-20 rounded-xl bg-gradient-to-br from-primary/30 to-chart-2/30 flex items-center justify-center">
-                  <ImageIcon className="size-10 text-muted-foreground" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="size-14 rounded-lg bg-gradient-to-br from-primary/30 to-chart-2/30 flex items-center justify-center">
+                    <ImageIcon className="size-7 text-muted-foreground" />
+                  </div>
                 </div>
               )}
-              <Badge variant={dob.location === "ckb" ? "default" : "secondary"} className="absolute top-2 right-2">
+              <Badge variant={dob.location === "ckb" ? "default" : "secondary"} className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0">
                 {dob.location === "btc" ? "RGB++" : "CKB"}
               </Badge>
             </div>
 
-            <CardContent className="p-4 space-y-3">
+            <CardContent className="p-3 space-y-2">
               <div>
-                <h3 className="font-medium truncate">{dob.clusterName || "Unknown Collection"}</h3>
-                <p className="text-xs text-muted-foreground font-mono">{truncateAddress(dob.id, 8, 6)}</p>
+                <h3 className="text-sm font-medium truncate">{dob.clusterName || "Unknown Collection"}</h3>
+                <p className="text-[11px] text-muted-foreground font-mono">{truncateAddress(dob.id, 6, 4)}</p>
               </div>
 
-              {dob.dobTraits && dob.dobTraits.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {dob.dobTraits.filter((t) => !t.name.startsWith("prev.")).slice(0, 2).map((trait, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
-                      {trait.name}: {trait.value}
-                    </Badge>
-                  ))}
-                  {dob.dobTraits.filter((t) => !t.name.startsWith("prev.")).length > 2 && (
-                    <Badge variant="outline" className="text-xs">+{dob.dobTraits.filter((t) => !t.name.startsWith("prev.")).length - 2}</Badge>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-1">
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {dob.location === "ckb" ? (
-                  <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "leap-to-btc"); }}><ArrowUpRight className="size-3.5" />Leap to BTC</Button>
+                  <Button size="sm" className="gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "leap-to-btc"); }}><ArrowUpRight className="size-3" />Leap to BTC</Button>
                 ) : (
-                  <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "leap-to-ckb"); }}><ArrowDownLeft className="size-3.5" />Leap to CKB</Button>
+                  <>
+                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "transfer-on-btc"); }}><ArrowLeftRight className="size-3" />Transfer on BTC</Button>
+                    <Button size="sm" className="gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "leap-to-ckb"); }}><ArrowDownLeft className="size-3" />Leap to CKB</Button>
+                  </>
                 )}
-                <Button size="sm" variant="outline" className="px-2.5"><ExternalLink className="size-3.5" /></Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* ── DOB Detail Modal ─────────────────────────── */}
+      {detailDob && (
+        <Dialog open={!!detailDob} onClose={() => { setDetailDob(null); setCopiedId(false); }}>
+          <DialogContent>
+            <DialogHeader onClose={() => { setDetailDob(null); setCopiedId(false); }}>
+              <DialogTitle>{detailDob.clusterName || "Unknown Collection"}</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              {/* Image */}
+              <div className="aspect-square rounded-lg overflow-hidden bg-secondary/50 relative">
+                {(detailDob.dobSvg || detailDob.dobImageUri) ? (
+                  <img
+                    src={detailDob.dobSvg
+                      ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(detailDob.dobSvg)}`
+                      : detailDob.dobImageUri!}
+                    alt={detailDob.clusterName || "DOB"}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <ImageIcon className="size-16 text-muted-foreground" />
+                  </div>
+                )}
+                <Badge variant={detailDob.location === "ckb" ? "default" : "secondary"} className="absolute top-2 right-2">
+                  {detailDob.location === "btc" ? "RGB++" : "CKB"}
+                </Badge>
+              </div>
+
+              {/* Info */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Spore ID</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-mono" title={detailDob.id}>{truncateAddress(detailDob.id, 10, 8)}</span>
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(detailDob.id); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }}
+                      className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedId ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {detailDob.clusterName && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Cluster</span>
+                    <span className="text-sm">{detailDob.clusterName}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Content Type</span>
+                  <Badge variant="outline">{detailDob.contentType || "unknown"}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Cell Capacity</span>
+                  <span className="text-sm font-mono">
+                    {detailDob.capacity
+                      ? `${(Number(BigInt(detailDob.capacity)) / 1e8).toLocaleString()} CKBytes`
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Traits */}
+              {visibleTraits.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs text-muted-foreground uppercase tracking-wider">Traits</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {visibleTraits.map((trait, idx) => (
+                      <div key={idx} className="rounded-lg bg-muted/50 px-3 py-2">
+                        <p className="text-[11px] text-muted-foreground">{trait.name}</p>
+                        <p className="text-sm font-medium truncate">{trait.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex flex-wrap gap-2 pt-1">
+                {detailDob.location === "ckb" ? (
+                  <Button size="sm" className="gap-1.5" onClick={() => { setDetailDob(null); openTxDialog(detailDob, "leap-to-btc"); }}>
+                    <ArrowUpRight className="size-4" />Leap to BTC
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setDetailDob(null); openTxDialog(detailDob, "transfer-on-btc"); }}>
+                      <ArrowLeftRight className="size-4" />Transfer on BTC
+                    </Button>
+                    <Button size="sm" className="gap-1.5" onClick={() => { setDetailDob(null); openTxDialog(detailDob, "leap-to-ckb"); }}>
+                      <ArrowDownLeft className="size-4" />Leap to CKB
+                    </Button>
+                  </>
+                )}
+              </div>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Spore Transaction Dialog */}
       {txDialogSpore && (

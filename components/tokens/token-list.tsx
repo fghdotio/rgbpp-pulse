@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
-import { formatBalance, truncateAddress, cn } from "@/lib/utils";
+import { formatBalance, truncateAddress, cn, getTokenInitial, getTokenColor } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check, Loader2 } from "lucide-react";
 import type { UdtAsset } from "@/lib/services/types";
 import { TransactionDialog, type TxDialogOperation } from "./transaction-dialog";
@@ -151,7 +151,7 @@ export function TokenList() {
                 <Card
                   key={token.typeScriptArgs}
                   className={cn(
-                    "cursor-pointer transition-all hover:border-primary/50",
+                    "transition-all hover:border-primary/50",
                     selectedToken === token.typeScriptArgs && "border-primary"
                   )}
                   onClick={() => setSelectedToken(token.typeScriptArgs)}
@@ -159,8 +159,8 @@ export function TokenList() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center">
-                          <span className="text-sm font-bold text-primary">{(token.symbol || token.name).slice(0, 2)}</span>
+                        <div className="size-10 rounded-full flex items-center justify-center" style={{ backgroundColor: getTokenColor(token.symbol, token.name).bg }}>
+                          <span className="text-sm font-bold" style={{ color: getTokenColor(token.symbol, token.name).fg }}>{getTokenInitial(token.symbol, token.name)}</span>
                         </div>
                         <div>
                           <CardTitle className="text-base">{token.name}</CardTitle>
@@ -207,18 +207,18 @@ export function TokenList() {
                     )}
 
                     {/* Actions */}
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex flex-wrap gap-2 pt-2">
                       {token.ckb && (
-                        <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token.ckb!, "leap-to-btc"); }}>
+                        <Button size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token.ckb!, "leap-to-btc"); }}>
                           <ArrowUpRight className="size-4" />Leap to BTC
                         </Button>
                       )}
                       {token.rgbpp && (
                         <>
-                          <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token.rgbpp!, "transfer-on-btc"); }}>
+                          <Button size="sm" variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token.rgbpp!, "transfer-on-btc"); }}>
                             <ArrowLeftRight className="size-4" />Transfer on BTC
                           </Button>
-                          <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token.rgbpp!, "leap-to-ckb"); }}>
+                          <Button size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token.rgbpp!, "leap-to-ckb"); }}>
                             <ArrowDownLeft className="size-4" />Leap to CKB
                           </Button>
                         </>
@@ -242,7 +242,7 @@ export function TokenList() {
               <Card
                 key={token.typeScriptArgs + token.location}
                 className={cn(
-                  "cursor-pointer transition-all hover:border-primary/50",
+                  "transition-all hover:border-primary/50",
                   selectedToken === token.typeScriptArgs + token.location && "border-primary"
                 )}
                 onClick={() => setSelectedToken(token.typeScriptArgs + token.location)}
@@ -250,8 +250,8 @@ export function TokenList() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-sm font-bold text-primary">{(token.symbol || token.name).slice(0, 2)}</span>
+                      <div className="size-10 rounded-full flex items-center justify-center" style={{ backgroundColor: getTokenColor(token.symbol, token.name).bg }}>
+                        <span className="text-sm font-bold" style={{ color: getTokenColor(token.symbol, token.name).fg }}>{getTokenInitial(token.symbol, token.name)}</span>
                       </div>
                       <div>
                         <CardTitle className="text-base">{token.name}</CardTitle>
@@ -264,15 +264,14 @@ export function TokenList() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-2xl font-bold font-mono">{formatBalance(token.balance, token.decimals)}</p>
-                    <p className="text-sm text-muted-foreground">{token.symbol}</p>
                   </div>
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-wrap gap-2 pt-2">
                     {token.location === "ckb" ? (
-                      <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token, "leap-to-btc"); }}><ArrowUpRight className="size-4" />Leap to BTC</Button>
+                      <Button size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token, "leap-to-btc"); }}><ArrowUpRight className="size-4" />Leap to BTC</Button>
                     ) : (
                       <>
-                        <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token, "transfer-on-btc"); }}><ArrowLeftRight className="size-4" />Transfer on BTC</Button>
-                        <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token, "leap-to-ckb"); }}><ArrowDownLeft className="size-4" />Leap to CKB</Button>
+                        <Button size="sm" variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token, "transfer-on-btc"); }}><ArrowLeftRight className="size-4" />Transfer on BTC</Button>
+                        <Button size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(token, "leap-to-ckb"); }}><ArrowDownLeft className="size-4" />Leap to CKB</Button>
                       </>
                     )}
                   </div>

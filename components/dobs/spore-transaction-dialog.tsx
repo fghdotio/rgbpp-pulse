@@ -17,6 +17,7 @@ import { truncateAddress } from "@/lib/utils";
 import {
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowLeftRight,
   Loader2,
   CircleDot,
   Image as ImageIcon,
@@ -26,10 +27,11 @@ import type { SporeAsset, TransactionPipeline } from "@/lib/services/types";
 import { usePipelines } from "@/lib/context/pipeline-context";
 import {
   sporeLeapToBtc,
+  sporeTransferOnBtc,
   sporeLeapToCkb,
 } from "@/src/services/rgbpp";
 
-export type SporeDialogOperation = "leap-to-btc" | "leap-to-ckb";
+export type SporeDialogOperation = "leap-to-btc" | "transfer-on-btc" | "leap-to-ckb";
 
 interface SporeTransactionDialogProps {
   open: boolean;
@@ -58,6 +60,15 @@ const operationConfig: Record<
     addressPlaceholder: "tb1q... or bc1q...",
     myAddressType: 'btc',
     submitLabel: "Leap to BTC",
+  },
+  "transfer-on-btc": {
+    title: "Transfer DOB on BTC",
+    description: "Transfer this RGB++ Spore/DOB to another BTC address",
+    icon: ArrowLeftRight,
+    addressLabel: "Recipient BTC Address",
+    addressPlaceholder: "tb1q... or bc1q...",
+    myAddressType: 'btc',
+    submitLabel: "Transfer",
   },
   "leap-to-ckb": {
     title: "Leap DOB to CKB",
@@ -122,6 +133,11 @@ export function SporeTransactionDialog({
       if (operation === "leap-to-btc") {
         await sporeLeapToBtc(
           { sporeTypeArgs: spore.id, signer, client },
+          wrappedOnUpdate
+        );
+      } else if (operation === "transfer-on-btc") {
+        await sporeTransferOnBtc(
+          { transfers: [{ btcAddress: address, sporeTypeArgs: spore.id }], signer, client },
           wrappedOnUpdate
         );
       } else if (operation === "leap-to-ckb") {

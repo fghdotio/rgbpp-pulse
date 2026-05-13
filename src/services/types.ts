@@ -34,6 +34,7 @@ export interface SporeAsset {
   clusterId?: string;
   clusterName?: string;
   location: AssetLocation;
+  capacity?: string;
   isMock?: boolean;
   /** Decoded DOB traits from dob-decoder-standalone-server */
   dobTraits?: import('./dob').DobTrait[];
