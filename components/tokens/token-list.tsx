@@ -83,10 +83,10 @@ export function TokenList() {
               All Tokens
             </Button>
             <Button variant="ghost" size="sm">
-              On CKB
+              RGB++
             </Button>
             <Button variant="ghost" size="sm">
-              On BTC
+              CKB-Native
             </Button>
           </div>
         </CardContent>

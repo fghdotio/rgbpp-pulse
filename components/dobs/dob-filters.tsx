@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export function DobFilters() {
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [filter, setFilter] = useState<"all" | "ckb" | "btc">("all");
+  const [filter, setFilter] = useState<"all" | "rgbpp" | "ckb">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = () => {
@@ -31,20 +31,20 @@ export function DobFilters() {
               All DOBs
             </Button>
             <Button
+              variant={filter === "rgbpp" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setFilter("rgbpp")}
+              className={filter === "rgbpp" ? "bg-primary/15 text-primary" : ""}
+            >
+              RGB++
+            </Button>
+            <Button
               variant={filter === "ckb" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setFilter("ckb")}
               className={filter === "ckb" ? "bg-primary/15 text-primary" : ""}
             >
-              On CKB
-            </Button>
-            <Button
-              variant={filter === "btc" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setFilter("btc")}
-              className={filter === "btc" ? "bg-primary/15 text-primary" : ""}
-            >
-              On BTC
+              CKB-Native
             </Button>
           </div>
 

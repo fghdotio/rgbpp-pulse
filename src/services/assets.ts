@@ -8,7 +8,7 @@
  */
 import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
-import { getAddressAssets, getAssetTypeInfo, type RgbppCell } from './api';
+import { getAddressAssets, type RgbppCell } from './api';
 import { batchDecodeDobs, renderDobToSvg } from './dob';
 
 /**
@@ -23,6 +23,109 @@ const KNOWN_SPORE_CODE_HASHES = [
   // testnet v0.2.1 (deprecated, but may still have live cells)
   '0x5e063b4c0e7abeaa6a428df3b693521a3050934cf3b0ae97a800d1bc31449398',
 ];
+
+// ─── xUDT Info Cell Lookup (replaces /rgbpp/v1/assets/type) ──
+
+/**
+ * xUDT info cell data format:
+ *   [0]       decimal (uint8)
+ *   [1]       name_len (uint8)
+ *   [2..2+name_len) name (utf8)
+ *   [2+name_len]    symbol_len (uint8)
+ *   [2+name_len+1..2+name_len+1+symbol_len) symbol (utf8)
+ */
+function parseXudtInfoData(data: string): { name: string; symbol: string; decimals: number } | null {
+  try {
+    const hex = data.startsWith('0x') ? data.slice(2) : data;
+    if (hex.length < 6) return null; // at least 3 bytes (decimal + name_len + symbol_len)
+
+    const bytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+    const decimals = bytes[0];
+    if (decimals >= 0xf0) return null; // reserved range
+
+    const nameLen = bytes[1];
+    if (2 + nameLen + 1 > bytes.length) return null;
+    const name = new TextDecoder().decode(bytes.slice(2, 2 + nameLen));
+
+    const symbolLen = bytes[2 + nameLen];
+    if (2 + nameLen + 1 + symbolLen > bytes.length) return null;
+    const symbol = new TextDecoder().decode(bytes.slice(2 + nameLen + 1, 2 + nameLen + 1 + symbolLen));
+
+    return { name, symbol, decimals };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Look up xUDT token metadata (name, symbol, decimals) by querying the
+ * on-chain info cell via CKB RPC. The info cell uses a UniqueType type script
+ * and its lock script hash equals the xUDT type script args.
+ *
+ * Falls back to defaults if the info cell is not found.
+ * Results are cached in-memory.
+ */
+const udtMetadataCache = new Map<string, { name: string; symbol: string; decimals: number }>();
+
+async function lookupUdtMetadata(
+  client: ccc.Client,
+  typeScriptArgs: string,
+): Promise<{ name: string; symbol: string; decimals: number }> {
+  const defaults = {
+    name: `xUDT ${typeScriptArgs.slice(0, 10)}...`,
+    symbol: typeScriptArgs.slice(2, 8).toUpperCase(),
+    decimals: 8,
+  };
+
+  const cached = udtMetadataCache.get(typeScriptArgs);
+  if (cached) return cached;
+
+  try {
+    // The xUDT info cell uses UniqueType as its type script.
+    // Its lock script is typically "anyone-can-pay" or the issuer's lock,
+    // but we find it by scanning all cells that have outputData matching
+    // a valid xUDT info format and whose lock hash equals typeScriptArgs.
+    //
+    // Strategy: find cells by lock hash prefix in typeScriptArgs
+    // The xUDT type args = lock_hash(owner) | [owner_mode flags | extension data]
+    // The first 32 bytes (64 hex chars) is the owner lock hash.
+    const ownerLockHash = typeScriptArgs.slice(0, 66); // 0x + 64 hex
+
+    // Search for cells locked by this lock hash that have data looking like xUDT info
+    // We use the UniqueType known script to narrow the search
+    const uniqueTypeInfo = await client.getKnownScript(ccc.KnownScript.UniqueType);
+
+    for await (const cell of client.findCells(
+      {
+        script: {
+          codeHash: uniqueTypeInfo.codeHash,
+          hashType: uniqueTypeInfo.hashType,
+          args: '0x', // prefix match
+        },
+        scriptType: 'type',
+        scriptSearchMode: 'prefix',
+        withData: true,
+      },
+      'desc',
+      50,
+    )) {
+      // Check if this cell's lock hash matches the xUDT owner
+      const lockHash = cell.cellOutput.lock.hash();
+      if (lockHash !== ownerLockHash) continue;
+
+      const parsed = parseXudtInfoData(cell.outputData ?? '0x');
+      if (parsed) {
+        udtMetadataCache.set(typeScriptArgs, parsed);
+        return parsed;
+      }
+    }
+  } catch {
+    // lookup failed, use defaults
+  }
+
+  udtMetadataCache.set(typeScriptArgs, defaults);
+  return defaults;
+}
 
 /**
  * Fetch CKB-native xUDT assets by querying the CKB indexer via CCC SDK.
@@ -103,28 +206,10 @@ export async function fetchCkbUdtAssets(
       }
     }
 
-    // Convert to UdtAsset array, enriching with metadata from the API
+    // Convert to UdtAsset array, enriching with metadata via CKB RPC
     const assets: UdtAsset[] = [];
     for (const [, info] of balanceMap) {
-      let name = `xUDT ${info.typeScriptArgs.slice(0, 10)}...`;
-      let symbol = info.typeScriptArgs.slice(2, 8).toUpperCase();
-      let decimals = 8;
-
-      // Try to look up real token info from the RGB++ API
-      try {
-        const typeInfo = await getAssetTypeInfo({
-          codeHash: info.typeScriptCodeHash,
-          args: info.typeScriptArgs,
-          hashType: info.typeScriptHashType as 'type' | 'data' | 'data1' | 'data2',
-        });
-        if (typeInfo && 'symbol' in typeInfo) {
-          name = typeInfo.name || name;
-          symbol = typeInfo.symbol || symbol;
-          decimals = typeInfo.decimal ?? decimals;
-        }
-      } catch {
-        // API lookup failed, use defaults
-      }
+      const { name, symbol, decimals } = await lookupUdtMetadata(client, info.typeScriptArgs);
 
       assets.push({
         type: 'udt',
@@ -196,27 +281,13 @@ export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[
       }
     }
 
-    // Convert to UdtAsset array, enriching with metadata
+    // Convert to UdtAsset array, enriching with metadata via CKB RPC
     const assets: UdtAsset[] = [];
     for (const [, info] of balanceMap) {
-      let name = `xUDT ${info.typeScript.args.slice(0, 10)}...`;
-      let symbol = info.typeScript.args.slice(2, 8).toUpperCase();
-      let decimals = 8;
-
-      try {
-        const typeInfo = await getAssetTypeInfo({
-          codeHash: info.typeScript.codeHash,
-          args: info.typeScript.args,
-          hashType: info.typeScript.hashType as 'type' | 'data' | 'data1' | 'data2',
-        });
-        if (typeInfo && 'symbol' in typeInfo) {
-          name = typeInfo.name || name;
-          symbol = typeInfo.symbol || symbol;
-          decimals = typeInfo.decimal ?? decimals;
-        }
-      } catch {
-        // API lookup failed, use defaults
-      }
+      // lookupUdtMetadata needs a client — use a temporary public testnet client
+      // (the caller fetchUdtAssets always passes client when available)
+      const tempClient = new ccc.ClientPublicTestnet();
+      const { name, symbol, decimals } = await lookupUdtMetadata(tempClient, info.typeScript.args);
 
       assets.push({
         type: 'udt',
@@ -493,8 +564,13 @@ export async function fetchCkbSporeAssets(
 
 /**
  * Fetch RGB++-bound Spore assets from the RGB++ API.
+ * Metadata is resolved on-chain: parseSporeData for contentType/clusterId,
+ * lookupClusterName via CKB RPC for cluster names.
  */
-export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAsset[]> {
+export async function fetchRgbppSporeAssets(
+  btcAddress: string,
+  client?: ccc.Client,
+): Promise<SporeAsset[]> {
   try {
     const cells = await getAddressAssets(btcAddress);
     const sporeCells = cells.filter((cell) => isSporeCell(cell));
@@ -504,21 +580,12 @@ export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAs
       const typeScript = cell.cellOutput.type;
       if (!typeScript) continue;
 
-      let clusterName = '';
-      let clusterId = '';
-      let contentType = 'unknown';
+      const { contentType, clusterId } = parseSporeData(cell.data);
 
-      try {
-        const info = await getAssetTypeInfo(typeScript);
-        if (info && info.type === 'spore') {
-          contentType = info.contentType;
-          if (info.cluster) {
-            clusterId = info.cluster.id;
-            clusterName = info.cluster.name;
-          }
-        }
-      } catch {
-        contentType = parseSporeData(cell.data).contentType;
+      // Look up cluster name via CKB RPC if client is available
+      let clusterName = '';
+      if (clusterId && client) {
+        clusterName = await lookupClusterName(client, clusterId);
       }
 
       spores.push({
@@ -556,9 +623,9 @@ export async function fetchSporeAssets(
     results.push(...ckbSpores);
   }
 
-  // RGB++-bound Spores via API
+  // RGB++-bound Spores via API + CKB RPC for metadata
   if (btcAddress) {
-    const rgbppSpores = await fetchRgbppSporeAssets(btcAddress);
+    const rgbppSpores = await fetchRgbppSporeAssets(btcAddress, client);
     results.push(...rgbppSpores);
   }
 

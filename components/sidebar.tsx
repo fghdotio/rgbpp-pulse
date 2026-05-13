@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Portfolio", href: "/", icon: LayoutDashboard },
   { name: "Tokens", href: "/tokens", icon: Coins },
   { name: "DOBs", href: "/dobs", icon: Image },
   { name: "Transactions", href: "/transactions", icon: ArrowLeftRight },
@@ -39,14 +39,9 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border">
-        <div className="flex items-center justify-center size-8 rounded-lg bg-primary/20">
-          <span className="text-primary font-bold text-sm">R+</span>
-        </div>
+        <img src="/logo.svg" alt="RGB++ Pulse" className="size-8" />
         {!collapsed && (
-          <div className="flex flex-col">
-            <span className="font-semibold text-foreground">RGB++ Pulse</span>
-            <span className="text-xs text-muted-foreground">Asset Manager</span>
-          </div>
+          <span className="font-semibold text-foreground">RGB++ Pulse</span>
         )}
       </div>
 

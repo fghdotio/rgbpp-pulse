@@ -38,7 +38,7 @@ export function PortfolioOverview() {
           </div>
           <h2 className="text-xl font-semibold mb-2">Connect Your Wallet</h2>
           <p className="text-muted-foreground mb-4">
-            Connect your wallet to view your RGB++ assets across CKB and Bitcoin networks.
+            Connect your wallet to view your RGB++ assets across Bitcoin and CKB networks.
           </p>
         </div>
       </Card>

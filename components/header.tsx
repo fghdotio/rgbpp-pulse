@@ -1,15 +1,40 @@
 "use client";
 
-import { Wallet, Bell, ChevronDown, LogOut } from "lucide-react";
+import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-react";
 import { useApp } from "@/lib/context/app-context";
 import { truncateAddress } from "@/lib/utils";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 export function Header() {
-  const { isConnected, walletAddress, btcAddress, openConnector, disconnect, notifications, dismissNotification } = useApp();
-  const [showNotifications, setShowNotifications] = useState(false);
+  const { isConnected, walletAddress, btcAddress, openConnector, disconnect } = useApp();
   const [showWalletMenu, setShowWalletMenu] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showWalletMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowWalletMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showWalletMenu]);
+
+  const copyToClipboard = useCallback(async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }, []);
+
+  const ckbExplorerUrl = walletAddress
+    ? `https://pudge.explorer.nervos.org/address/${walletAddress}`
+    : undefined;
+
+  const btcExplorerUrl = btcAddress
+    ? `https://mempool.space/testnet/address/${btcAddress}`
+    : undefined;
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-card">
@@ -18,52 +43,10 @@ export function Header() {
 
       {/* Right Side Actions */}
       <div className="flex items-center gap-3">
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative flex items-center justify-center size-10 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          >
-            <Bell className="size-5" />
-            {notifications.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 size-2 bg-primary rounded-full" />
-            )}
-          </button>
-
-          {showNotifications && notifications.length > 0 && (
-            <div className="absolute right-0 top-12 w-80 bg-popover border border-border rounded-xl shadow-xl z-50">
-              <div className="p-3 border-b border-border">
-                <h3 className="font-medium text-sm">Notifications</h3>
-              </div>
-              <div className="max-h-64 overflow-y-auto">
-                {notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    className="flex items-start gap-3 p-3 hover:bg-accent/50 cursor-pointer"
-                    onClick={() => dismissNotification(n.id)}
-                  >
-                    <div
-                      className={cn(
-                        "size-2 mt-1.5 rounded-full shrink-0",
-                        n.level === "error" && "bg-destructive",
-                        n.level === "warn" && "bg-warning",
-                        n.level === "info" && "bg-primary"
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{n.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{n.message}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Wallet Connection */}
         {isConnected ? (
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowWalletMenu(!showWalletMenu)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary hover:bg-accent transition-colors"
@@ -81,27 +64,86 @@ export function Header() {
             </button>
 
             {showWalletMenu && (
-              <div className="absolute right-0 top-12 w-64 bg-popover border border-border rounded-xl shadow-xl z-50">
-                <div className="p-3 border-b border-border">
-                  <p className="text-xs text-muted-foreground">CKB Address</p>
-                  <p className="text-sm font-mono truncate">{walletAddress}</p>
-                  {btcAddress && (
-                    <>
-                      <p className="text-xs text-muted-foreground mt-2">BTC Address</p>
-                      <p className="text-sm font-mono truncate">{btcAddress}</p>
-                    </>
-                  )}
+              <div className="absolute right-0 top-12 w-80 bg-popover border border-border rounded-xl shadow-xl z-50">
+                {/* BTC Address */}
+                {btcAddress && (
+                  <div className="p-3 pb-0">
+                    <p className="text-xs text-muted-foreground mb-1.5">BTC Address</p>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
+                      <span className="text-sm font-mono truncate flex-1">
+                        {truncateAddress(btcAddress, 10, 8)}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(btcAddress, "btc")}
+                        className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                        title="Copy address"
+                      >
+                        {copiedField === "btc" ? (
+                          <Check className="size-3.5 text-green-500" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                      </button>
+                      {btcExplorerUrl && (
+                        <a
+                          href={btcExplorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                          title="View on Mempool"
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* CKB Address */}
+                <div className="p-3">
+                  <p className="text-xs text-muted-foreground mb-1.5">CKB Address</p>
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
+                    <span className="text-sm font-mono truncate flex-1">
+                      {truncateAddress(walletAddress || "", 10, 8)}
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(walletAddress || "", "ckb")}
+                      className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                      title="Copy address"
+                    >
+                      {copiedField === "ckb" ? (
+                        <Check className="size-3.5 text-green-500" />
+                      ) : (
+                        <Copy className="size-3.5" />
+                      )}
+                    </button>
+                    {ckbExplorerUrl && (
+                      <a
+                        href={ckbExplorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                        title="View on CKB Explorer"
+                      >
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    disconnect();
-                    setShowWalletMenu(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-destructive hover:bg-accent transition-colors"
-                >
-                  <LogOut className="size-4" />
-                  Disconnect
-                </button>
+
+                {/* Disconnect */}
+                <div className="border-t border-border">
+                  <button
+                    onClick={() => {
+                      disconnect();
+                      setShowWalletMenu(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-destructive hover:bg-accent transition-colors rounded-b-xl"
+                  >
+                    <LogOut className="size-4" />
+                    Disconnect
+                  </button>
+                </div>
               </div>
             )}
           </div>
