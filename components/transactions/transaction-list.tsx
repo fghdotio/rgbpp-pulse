@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/context/app-context";
+import { usePipelines } from "@/lib/context/pipeline-context";
 import { truncateAddress, formatRelativeTime } from "@/lib/utils";
 import {
   ArrowUpRight,
@@ -17,58 +18,10 @@ import {
   Clock,
   XCircle,
   Loader2,
+  Inbox,
 } from "lucide-react";
 import { useState } from "react";
-import type { TransactionPipeline, TransactionStep } from "@/lib/services/types";
-
-// Mock data
-const mockPipelines: TransactionPipeline[] = [
-  {
-    id: "pipe-1",
-    operation: "leap-to-btc",
-    assetType: "udt",
-    assetName: "RTT",
-    status: "completed",
-    createdAt: Date.now() - 1000 * 60 * 30,
-    completedAt: Date.now() - 1000 * 60 * 25,
-    steps: [
-      { id: "s1", label: "Building BTC Seal PSBT", status: "done", timestamp: Date.now() - 1000 * 60 * 30, chain: "btc" },
-      { id: "s2", label: "Signing & Broadcasting BTC TX", status: "done", timestamp: Date.now() - 1000 * 60 * 29, txHash: "0xbtc123...", chain: "btc" },
-      { id: "s3", label: "Waiting for BTC Confirmation", status: "done", timestamp: Date.now() - 1000 * 60 * 28, chain: "btc" },
-      { id: "s4", label: "Building RGB++ Lock", status: "done", timestamp: Date.now() - 1000 * 60 * 27, chain: "ckb" },
-      { id: "s5", label: "Composing CKB Transaction", status: "done", timestamp: Date.now() - 1000 * 60 * 26, chain: "ckb" },
-      { id: "s6", label: "Broadcasting to CKB", status: "done", timestamp: Date.now() - 1000 * 60 * 25, txHash: "0xckb456...", chain: "ckb" },
-    ],
-  },
-  {
-    id: "pipe-2",
-    operation: "transfer-on-btc",
-    assetType: "udt",
-    assetName: "SCX",
-    status: "active",
-    createdAt: Date.now() - 1000 * 60 * 5,
-    steps: [
-      { id: "s1", label: "Building BTC Transaction", status: "done", timestamp: Date.now() - 1000 * 60 * 5, chain: "btc" },
-      { id: "s2", label: "Building CKB Partial TX", status: "done", timestamp: Date.now() - 1000 * 60 * 4, chain: "ckb" },
-      { id: "s3", label: "Signing BTC Transaction", status: "active", chain: "btc" },
-      { id: "s4", label: "Broadcasting BTC TX", status: "pending", chain: "btc" },
-      { id: "s5", label: "Finalizing CKB TX", status: "pending", chain: "ckb" },
-    ],
-  },
-  {
-    id: "pipe-3",
-    operation: "leap-to-ckb",
-    assetType: "spore",
-    assetName: "Nervape #42",
-    status: "error",
-    createdAt: Date.now() - 1000 * 60 * 60 * 2,
-    steps: [
-      { id: "s1", label: "Building BTC Transaction", status: "done", chain: "btc" },
-      { id: "s2", label: "Building CKB Partial TX", status: "done", chain: "ckb" },
-      { id: "s3", label: "Signing BTC Transaction", status: "error", error: "User rejected the request", chain: "btc" },
-    ],
-  },
-];
+import type { TransactionStep } from "@/lib/services/types";
 
 const operationIcons = {
   "leap-to-btc": ArrowUpRight,
@@ -104,6 +57,7 @@ function StepIcon({ status }: { status: TransactionStep["status"] }) {
 
 export function TransactionList() {
   const { isConnected } = useApp();
+  const { pipelines } = usePipelines();
   const [expandedPipeline, setExpandedPipeline] = useState<string | null>(null);
 
   if (!isConnected) {
@@ -122,11 +76,28 @@ export function TransactionList() {
     );
   }
 
+  if (pipelines.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+          <Inbox className="size-10 text-muted-foreground/40" />
+          <p className="text-sm">No transactions yet</p>
+          <p className="text-xs">
+            Transactions you submit from the Tokens or DOBs pages will appear here.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {mockPipelines.map((pipeline) => {
-        const Icon = operationIcons[pipeline.operation];
+      {pipelines.map((pipeline) => {
+        const Icon = operationIcons[pipeline.operation] || ArrowLeftRight;
         const isExpanded = expandedPipeline === pipeline.id;
+
+        // Auto-expand active pipelines
+        const shouldShow = isExpanded || pipeline.status === "active";
 
         return (
           <Card key={pipeline.id} className="overflow-hidden">
@@ -134,19 +105,23 @@ export function TransactionList() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="size-10 rounded-lg bg-secondary flex items-center justify-center">
-                    <Icon className="size-5 text-muted-foreground" />
+                    {pipeline.status === "active" ? (
+                      <Loader2 className="size-5 text-warning animate-spin" />
+                    ) : (
+                      <Icon className="size-5 text-muted-foreground" />
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-base">
-                        {operationLabels[pipeline.operation]}
+                        {operationLabels[pipeline.operation] || pipeline.operation}
                       </CardTitle>
                       <Badge variant={statusColors[pipeline.status]}>
                         {pipeline.status}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {pipeline.assetName} ({pipeline.assetType.toUpperCase()}) •{" "}
+                      {pipeline.assetName} ({pipeline.assetType?.toUpperCase() || "UDT"}) •{" "}
                       {formatRelativeTime(pipeline.createdAt)}
                     </p>
                   </div>
@@ -154,9 +129,9 @@ export function TransactionList() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setExpandedPipeline(isExpanded ? null : pipeline.id)}
+                  onClick={() => setExpandedPipeline(shouldShow && !pipeline.status.match(/active/) ? null : pipeline.id)}
                 >
-                  {isExpanded ? (
+                  {shouldShow ? (
                     <ChevronUp className="size-4" />
                   ) : (
                     <ChevronDown className="size-4" />
@@ -165,7 +140,7 @@ export function TransactionList() {
               </div>
             </CardHeader>
 
-            {isExpanded && (
+            {shouldShow && pipeline.steps && pipeline.steps.length > 0 && (
               <CardContent className="pt-0 pb-4 px-4">
                 <div className="border-t border-border pt-4">
                   <div className="space-y-3">
@@ -191,7 +166,13 @@ export function TransactionList() {
                           )}
                           {step.txHash && (
                             <a
-                              href="#"
+                              href={
+                                step.chain === "btc"
+                                  ? `https://mempool.space/testnet/tx/${step.txHash}`
+                                  : `https://testnet.explorer.nervos.org/transaction/${step.txHash}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
                             >
                               {truncateAddress(step.txHash, 10, 8)}

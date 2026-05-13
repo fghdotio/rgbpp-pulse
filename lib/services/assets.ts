@@ -10,6 +10,7 @@ import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
 import { getAddressAssets, getAssetTypeInfo, type RgbppCell } from './api';
 import { batchDecodeDobs, renderDobToSvg } from './dob';
+import { cacheGet, cacheSet } from '@/lib/utils/cache';
 
 /**
  * Spore type script code_hashes from spore-contract VERSIONS.md
@@ -392,16 +393,14 @@ const KNOWN_CLUSTER_CODE_HASHES = [
 
 /**
  * Look up a cluster cell by clusterId via CKB RPC and parse its name.
- * Caches results in-memory to avoid redundant queries.
+ * Caches results persistently in localStorage.
  */
-const clusterNameCache = new Map<string, string>();
-
 async function lookupClusterName(
   client: ccc.Client,
   clusterId: string,
 ): Promise<string> {
   if (!clusterId) return '';
-  const cached = clusterNameCache.get(clusterId);
+  const cached = cacheGet<string>('cluster', clusterId);
   if (cached !== undefined) return cached;
 
   try {
@@ -421,14 +420,14 @@ async function lookupClusterName(
         1,
       )) {
         const { name } = parseClusterData(cell.outputData ?? '0x');
-        clusterNameCache.set(clusterId, name);
+        cacheSet('cluster', clusterId, name);
         return name;
       }
     }
   } catch {
     // lookup failed
   }
-  clusterNameCache.set(clusterId, '');
+  cacheSet('cluster', clusterId, '');
   return '';
 }
 

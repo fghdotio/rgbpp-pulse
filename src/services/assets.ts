@@ -10,6 +10,7 @@ import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
 import { getAddressAssets, type RgbppCell } from './api';
 import { batchDecodeDobs, renderDobToSvg } from './dob';
+import { cacheGet, cacheSet } from '@/lib/utils/cache';
 
 /**
  * Spore type script code_hashes from spore-contract VERSIONS.md
@@ -63,10 +64,8 @@ function parseXudtInfoData(data: string): { name: string; symbol: string; decima
  * and its lock script hash equals the xUDT type script args.
  *
  * Falls back to defaults if the info cell is not found.
- * Results are cached in-memory.
+ * Results are cached persistently in localStorage.
  */
-const udtMetadataCache = new Map<string, { name: string; symbol: string; decimals: number }>();
-
 async function lookupUdtMetadata(
   client: ccc.Client,
   typeScriptArgs: string,
@@ -77,22 +76,11 @@ async function lookupUdtMetadata(
     decimals: 8,
   };
 
-  const cached = udtMetadataCache.get(typeScriptArgs);
+  const cached = cacheGet<{ name: string; symbol: string; decimals: number }>('udtMeta', typeScriptArgs);
   if (cached) return cached;
 
   try {
-    // The xUDT info cell uses UniqueType as its type script.
-    // Its lock script is typically "anyone-can-pay" or the issuer's lock,
-    // but we find it by scanning all cells that have outputData matching
-    // a valid xUDT info format and whose lock hash equals typeScriptArgs.
-    //
-    // Strategy: find cells by lock hash prefix in typeScriptArgs
-    // The xUDT type args = lock_hash(owner) | [owner_mode flags | extension data]
-    // The first 32 bytes (64 hex chars) is the owner lock hash.
-    const ownerLockHash = typeScriptArgs.slice(0, 66); // 0x + 64 hex
-
-    // Search for cells locked by this lock hash that have data looking like xUDT info
-    // We use the UniqueType known script to narrow the search
+    const ownerLockHash = typeScriptArgs.slice(0, 66);
     const uniqueTypeInfo = await client.getKnownScript(ccc.KnownScript.UniqueType);
 
     for await (const cell of client.findCells(
@@ -100,7 +88,7 @@ async function lookupUdtMetadata(
         script: {
           codeHash: uniqueTypeInfo.codeHash,
           hashType: uniqueTypeInfo.hashType,
-          args: '0x', // prefix match
+          args: '0x',
         },
         scriptType: 'type',
         scriptSearchMode: 'prefix',
@@ -109,13 +97,12 @@ async function lookupUdtMetadata(
       'desc',
       50,
     )) {
-      // Check if this cell's lock hash matches the xUDT owner
       const lockHash = cell.cellOutput.lock.hash();
       if (lockHash !== ownerLockHash) continue;
 
       const parsed = parseXudtInfoData(cell.outputData ?? '0x');
       if (parsed) {
-        udtMetadataCache.set(typeScriptArgs, parsed);
+        cacheSet('udtMeta', typeScriptArgs, parsed);
         return parsed;
       }
     }
@@ -123,7 +110,7 @@ async function lookupUdtMetadata(
     // lookup failed, use defaults
   }
 
-  udtMetadataCache.set(typeScriptArgs, defaults);
+  cacheSet('udtMeta', typeScriptArgs, defaults);
   return defaults;
 }
 
@@ -463,16 +450,14 @@ const KNOWN_CLUSTER_CODE_HASHES = [
 
 /**
  * Look up a cluster cell by clusterId via CKB RPC and parse its name.
- * Caches results in-memory to avoid redundant queries.
+ * Caches results persistently in localStorage.
  */
-const clusterNameCache = new Map<string, string>();
-
 async function lookupClusterName(
   client: ccc.Client,
   clusterId: string,
 ): Promise<string> {
   if (!clusterId) return '';
-  const cached = clusterNameCache.get(clusterId);
+  const cached = cacheGet<string>('cluster', clusterId);
   if (cached !== undefined) return cached;
 
   try {
@@ -492,14 +477,14 @@ async function lookupClusterName(
         1,
       )) {
         const { name } = parseClusterData(cell.outputData ?? '0x');
-        clusterNameCache.set(clusterId, name);
+        cacheSet('cluster', clusterId, name);
         return name;
       }
     }
   } catch {
     // lookup failed
   }
-  clusterNameCache.set(clusterId, '');
+  cacheSet('cluster', clusterId, '');
   return '';
 }
 

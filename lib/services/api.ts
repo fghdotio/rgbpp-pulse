@@ -123,9 +123,20 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
 /**
  * Get RGB++ assets (cells) bound to a BTC address.
  * GET /rgbpp/v1/address/{btc_address}/assets
+ * Results are cached in-memory with a 30s TTL.
  */
+const addressAssetsCache = new Map<string, { data: RgbppCell[]; ts: number }>();
+const ADDRESS_ASSETS_TTL = 30_000; // 30 seconds
+
 export async function getAddressAssets(btcAddress: string): Promise<RgbppCell[]> {
-  return fetchApi<RgbppCell[]>(`/rgbpp/v1/address/${btcAddress}/assets`);
+  const cached = addressAssetsCache.get(btcAddress);
+  if (cached && Date.now() - cached.ts < ADDRESS_ASSETS_TTL) {
+    return cached.data;
+  }
+
+  const data = await fetchApi<RgbppCell[]>(`/rgbpp/v1/address/${btcAddress}/assets`);
+  addressAssetsCache.set(btcAddress, { data, ts: Date.now() });
+  return data;
 }
 
 /**
@@ -139,18 +150,18 @@ export async function getAddressBalance(btcAddress: string): Promise<AddressBala
 /**
  * Get RGB++ asset type info by type script.
  * GET /rgbpp/v1/assets/type?type_script=...
- * Results are cached in-memory to avoid redundant requests.
+ * Results are cached persistently in localStorage.
  */
-const assetTypeInfoCache = new Map<string, AssetTypeInfo>();
+import { cacheGet, cacheSet } from '@/lib/utils/cache';
 
 export async function getAssetTypeInfo(typeScript: CkbScript): Promise<AssetTypeInfo> {
   const cacheKey = `${typeScript.codeHash}:${typeScript.hashType}:${typeScript.args}`;
-  const cached = assetTypeInfoCache.get(cacheKey);
+  const cached = cacheGet<AssetTypeInfo>('assetType', cacheKey);
   if (cached !== undefined) return cached;
 
   const encoded = encodeURIComponent(JSON.stringify(typeScript));
   const result = await fetchApi<AssetTypeInfo>(`/rgbpp/v1/assets/type?type_script=${encoded}`);
-  assetTypeInfoCache.set(cacheKey, result);
+  cacheSet('assetType', cacheKey, result);
   return result;
 }
 

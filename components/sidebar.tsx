@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { usePipelines } from "@/lib/context/pipeline-context";
 
 const navigation = [
   { name: "Portfolio", href: "/", icon: LayoutDashboard },
@@ -29,6 +30,7 @@ const externalLinks = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { activeCount } = usePipelines();
 
   return (
     <aside
@@ -55,14 +57,24 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative",
                   isActive
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
                 <item.icon className="size-5 shrink-0" />
-                {!collapsed && <span>{item.name}</span>}
+                {!collapsed && (
+                  <span className="flex-1">{item.name}</span>
+                )}
+                {!collapsed && item.name === "Transactions" && activeCount > 0 && (
+                  <span className="flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-warning/15 text-warning text-xs font-medium">
+                    {activeCount}
+                  </span>
+                )}
+                {collapsed && item.name === "Transactions" && activeCount > 0 && (
+                  <span className="absolute top-1 right-1 size-2 rounded-full bg-warning" />
+                )}
               </Link>
             );
           })}

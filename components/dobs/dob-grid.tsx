@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,21 @@ import { useAssets } from "@/lib/context/assets-context";
 import { truncateAddress } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownLeft, Image as ImageIcon, ExternalLink, Loader2 } from "lucide-react";
 import type { SporeAsset } from "@/lib/services/types";
+import { SporeTransactionDialog, type SporeDialogOperation } from "./spore-transaction-dialog";
 
 export function DobGrid() {
   const { isConnected } = useApp();
   const { sporeAssets, loading, enrichingDobs } = useAssets();
   const [selectedDob, setSelectedDob] = useState<SporeAsset | null>(null);
+  const [txDialogSpore, setTxDialogSpore] = useState<SporeAsset | null>(null);
+  const [txDialogOp, setTxDialogOp] = useState<SporeDialogOperation>("leap-to-btc");
+  const [txDialogOpen, setTxDialogOpen] = useState(false);
+
+  const openTxDialog = useCallback((spore: SporeAsset, op: SporeDialogOperation) => {
+    setTxDialogSpore(spore);
+    setTxDialogOp(op);
+    setTxDialogOpen(true);
+  }, []);
 
   if (!isConnected) {
     return (
@@ -102,9 +112,9 @@ export function DobGrid() {
 
               <div className="flex gap-2 pt-1">
                 {dob.location === "ckb" ? (
-                  <Button size="sm" className="flex-1 gap-1.5"><ArrowUpRight className="size-3.5" />Leap to BTC</Button>
+                  <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "leap-to-btc"); }}><ArrowUpRight className="size-3.5" />Leap to BTC</Button>
                 ) : (
-                  <Button size="sm" className="flex-1 gap-1.5"><ArrowDownLeft className="size-3.5" />Leap to CKB</Button>
+                  <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); openTxDialog(dob, "leap-to-ckb"); }}><ArrowDownLeft className="size-3.5" />Leap to CKB</Button>
                 )}
                 <Button size="sm" variant="outline" className="px-2.5"><ExternalLink className="size-3.5" /></Button>
               </div>
@@ -112,6 +122,16 @@ export function DobGrid() {
           </Card>
         ))}
       </div>
+
+      {/* Spore Transaction Dialog */}
+      {txDialogSpore && (
+        <SporeTransactionDialog
+          open={txDialogOpen}
+          onClose={() => setTxDialogOpen(false)}
+          spore={txDialogSpore}
+          operation={txDialogOp}
+        />
+      )}
     </>
   );
 }

@@ -9,6 +9,8 @@ interface Notification {
   title: string;
   message: string;
   timestamp: number;
+  actionLabel?: string;
+  actionHref?: string;
 }
 
 interface AppContextValue {
@@ -24,7 +26,7 @@ interface AppContextValue {
 
   /** Notifications */
   notifications: Notification[];
-  notify: (level: 'info' | 'warn' | 'error', title: string, message: string) => void;
+  notify: (level: 'info' | 'warn' | 'error', title: string, message: string, options?: { actionLabel?: string; actionHref?: string }) => void;
   dismissNotification: (id: string) => void;
 }
 
@@ -80,12 +82,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [cccDisconnect]);
 
   const notify = useCallback(
-    (level: 'info' | 'warn' | 'error', title: string, message: string) => {
+    (level: 'info' | 'warn' | 'error', title: string, message: string, options?: { actionLabel?: string; actionHref?: string }) => {
       const id = Math.random().toString(36).substring(2, 10);
-      setNotifications((prev) => [{ id, level, title, message, timestamp: Date.now() }, ...prev].slice(0, 10));
+      setNotifications((prev) => [{ id, level, title, message, timestamp: Date.now(), ...options }, ...prev].slice(0, 10));
       setTimeout(() => {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
-      }, 6000);
+      }, 5000);
     },
     [],
   );
