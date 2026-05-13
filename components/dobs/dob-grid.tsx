@@ -21,17 +21,28 @@ import type { DobChainFilter } from "@/lib/services/types";
 
 interface DobGridProps {
   filter: DobChainFilter;
+  searchQuery?: string;
 }
 
-export function DobGrid({ filter }: DobGridProps) {
+export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
   const { isConnected } = useApp();
   const { sporeAssets, loading, enrichingDobs } = useAssets();
 
   const filteredAssets = useMemo(() => {
-    if (filter === "all") return [...sporeAssets].sort((a, b) => (a.location === "btc" ? -1 : 1) - (b.location === "btc" ? -1 : 1));
-    if (filter === "rgbpp") return sporeAssets.filter((s) => s.location === "btc");
-    return sporeAssets.filter((s) => s.location === "ckb");
-  }, [sporeAssets, filter]);
+    let result: typeof sporeAssets;
+    if (filter === "all") result = [...sporeAssets].sort((a, b) => (a.location === "btc" ? -1 : 1) - (b.location === "btc" ? -1 : 1));
+    else if (filter === "rgbpp") result = sporeAssets.filter((s) => s.location === "btc");
+    else result = sporeAssets.filter((s) => s.location === "ckb");
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((s) =>
+        (s.clusterName || "").toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [sporeAssets, filter, searchQuery]);
 
   const [detailDob, setDetailDob] = useState<SporeAsset | null>(null);
   const [copiedId, setCopiedId] = useState(false);

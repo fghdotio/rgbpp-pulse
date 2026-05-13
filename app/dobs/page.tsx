@@ -9,6 +9,7 @@ import type { DobChainFilter } from "@/lib/services/types";
 
 export default function DobsPage() {
   const [filter, setFilter] = useState<DobChainFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   return (
     <DashboardLayout>
@@ -23,10 +24,15 @@ export default function DobsPage() {
         </div>
 
         {/* Filters */}
-        <DobFilters filter={filter} onFilterChange={setFilter} />
+        <DobFilters
+          filter={filter}
+          onFilterChange={setFilter}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
 
         {/* DOB Grid */}
-        <DobGrid filter={filter} />
+        <DobGrid filter={filter} searchQuery={searchQuery} />
       </div>
     </DashboardLayout>
   );

@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
 import { formatBalance, truncateAddress, cn, getTokenInitial, getTokenColor } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check, Loader2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check, Loader2, Search } from "lucide-react";
 import type { UdtAsset } from "@/lib/services/types";
 import { TransactionDialog, type TxDialogOperation } from "./transaction-dialog";
+import { Input } from "@/components/ui/input";
 
 /** A merged view of the same UDT across CKB and RGB++ locations */
 interface MergedToken {
@@ -57,6 +58,7 @@ export function TokenList() {
   const [txDialogToken, setTxDialogToken] = useState<UdtAsset | null>(null);
   const [txDialogOp, setTxDialogOp] = useState<TxDialogOperation>("leap-to-btc");
   const [txDialogOpen, setTxDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const openTxDialog = useCallback((token: UdtAsset, op: TxDialogOperation) => {
     setTxDialogToken(token);
@@ -100,13 +102,18 @@ export function TokenList() {
   }
 
   /* ── Filtered data ─────────────────────────────────── */
+  const q = searchQuery.trim().toLowerCase();
+
   const filteredSingle = udtAssets.filter((t) => {
-    if (filter === "rgbpp") return t.location === "btc";
-    if (filter === "ckb") return t.location === "ckb";
+    if (filter === "rgbpp" && t.location !== "btc") return false;
+    if (filter === "ckb" && t.location !== "ckb") return false;
+    if (q && !t.name.toLowerCase().includes(q) && !t.symbol.toLowerCase().includes(q) && !t.typeScriptArgs.toLowerCase().includes(q)) return false;
     return true;
   });
 
-  const filteredMerged = filter === "all" ? merged : [];
+  const filteredMerged = filter === "all"
+    ? (q ? merged.filter((t) => t.name.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q) || t.typeScriptArgs.toLowerCase().includes(q)) : merged)
+    : [];
 
   /* ── Filter tab counts ─────────────────────────────── */
   const mergedCount = merged.length;
@@ -117,7 +124,7 @@ export function TokenList() {
     <div className="space-y-4">
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-2">
               {([
                 { key: "all" as const, label: "All", count: mergedCount },
@@ -134,6 +141,15 @@ export function TokenList() {
                   {label} ({count})
                 </Button>
               ))}
+            </div>
+            <div className="relative ml-auto w-full sm:w-56">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search by name or symbol…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
             </div>
           </div>
         </CardContent>
