@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { UdtAsset, TransactionPipeline } from "@/lib/services/types";
 import { usePipelines } from "@/lib/context/pipeline-context";
+import { useSigningLock } from "@/lib/hooks/useSigningLock";
 import {
   udtLeapToBtc,
   udtTransferOnBtc,
@@ -93,6 +94,7 @@ export function TransactionDialog({
 }: TransactionDialogProps) {
   const { signer, client, btcAddress, walletAddress, notify } = useApp();
   const { createOnUpdate } = usePipelines();
+  const walletLocked = useSigningLock();
   const [amount, setAmount] = useState("");
   const [address, setAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -126,7 +128,7 @@ export function TransactionDialog({
     }
   };
 
-  const canSubmit = isValidAmount() && address.length > 0 && !submitting;
+  const canSubmit = isValidAmount() && address.length > 0 && !submitting && !walletLocked;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -241,6 +243,12 @@ export function TransactionDialog({
             <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-warning/10 border border-warning/20">
               <Loader2 className="size-4 text-warning animate-spin shrink-0" />
               <p className="text-sm text-warning">Awaiting wallet signature…</p>
+            </div>
+          )}
+          {!submitting && walletLocked && (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/50 border border-border">
+              <Loader2 className="size-4 text-muted-foreground animate-spin shrink-0" />
+              <p className="text-sm text-muted-foreground">Another transaction is awaiting wallet approval…</p>
             </div>
           )}
 

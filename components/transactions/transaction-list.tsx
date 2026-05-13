@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -299,25 +299,41 @@ export function TransactionList({
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
+  // Track what address we last fetched for, to avoid duplicate calls
+  // when context re-renders cause the effect to re-fire with the same address.
+  const lastFetchedAddr = useRef<string | null>(null);
+  const fetchIdRef = useRef(0);
+
   // ── Initial fetch ─────────────────────────────────────────
-  const fetchInitial = useCallback(async () => {
+  const fetchInitial = useCallback(async (force?: boolean) => {
     if (!btcAddress) return;
+
+    // Skip if we already fetched for this address (unless forced)
+    if (!force && lastFetchedAddr.current === btcAddress) return;
+
+    const id = ++fetchIdRef.current;
+    lastFetchedAddr.current = btcAddress;
     setLoading(true);
     setError(null);
     try {
       const result = await getAddressActivity(btcAddress, {
         rgbppOnly: true,
       });
+      // Only apply results if this is still the latest fetch
+      if (fetchIdRef.current !== id) return;
       setAllTxs(result.txs);
       setCursor(result.cursor);
       setHasMore(!!result.cursor && result.txs.length > 0);
     } catch (err) {
+      if (fetchIdRef.current !== id) return;
       console.warn("Failed to load transactions:", err);
       setError(
         err instanceof Error ? err.message : "Failed to load transactions"
       );
     } finally {
-      setLoading(false);
+      if (fetchIdRef.current === id) {
+        setLoading(false);
+      }
     }
   }, [btcAddress]);
 
@@ -328,6 +344,7 @@ export function TransactionList({
       setAllTxs([]);
       setCursor(undefined);
       setHasMore(false);
+      lastFetchedAddr.current = null;
     }
   }, [isConnected, btcAddress, fetchInitial]);
 
@@ -438,7 +455,7 @@ export function TransactionList({
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <p className="text-sm text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={fetchInitial}>
+          <Button variant="outline" size="sm" onClick={() => fetchInitial(true)}>
             Retry
           </Button>
         </CardContent>

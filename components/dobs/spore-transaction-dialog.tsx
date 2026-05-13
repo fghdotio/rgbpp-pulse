@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { SporeAsset, TransactionPipeline } from "@/lib/services/types";
 import { usePipelines } from "@/lib/context/pipeline-context";
+import { useSigningLock } from "@/lib/hooks/useSigningLock";
 import {
   sporeLeapToBtc,
   sporeTransferOnBtc,
@@ -89,6 +90,7 @@ export function SporeTransactionDialog({
 }: SporeTransactionDialogProps) {
   const { signer, client, btcAddress, walletAddress, notify } = useApp();
   const { createOnUpdate } = usePipelines();
+  const walletLocked = useSigningLock();
   const [address, setAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +99,7 @@ export function SporeTransactionDialog({
   const Icon = config.icon;
   const myAddress = config.myAddressType === 'btc' ? btcAddress : walletAddress;
 
-  const canSubmit = address.length > 0 && !submitting;
+  const canSubmit = address.length > 0 && !submitting && !walletLocked;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -194,6 +196,12 @@ export function SporeTransactionDialog({
             <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-warning/10 border border-warning/20">
               <Loader2 className="size-4 text-warning animate-spin shrink-0" />
               <p className="text-sm text-warning">Awaiting wallet signature…</p>
+            </div>
+          )}
+          {!submitting && walletLocked && (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/50 border border-border">
+              <Loader2 className="size-4 text-muted-foreground animate-spin shrink-0" />
+              <p className="text-sm text-muted-foreground">Another transaction is awaiting wallet approval…</p>
             </div>
           )}
 

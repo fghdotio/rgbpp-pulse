@@ -38,43 +38,6 @@ function formatError(err: unknown): string {
   }
 }
 
-// ─── Global Signing Mutex ────────────────────────────────────
-//
-// Browser wallet extensions (OKX, UniSat, JoyID) can only handle one
-// approval popup at a time. Concurrent signing requests cause:
-//   "Another approval request is already pending" (-32603)
-//
-// This mutex serializes all operations that trigger wallet signing,
-// including both user-initiated transactions and checkpoint recovery.
-
-let _signingLock: Promise<unknown> = Promise.resolve();
-
-/**
- * Acquire the global signing lock. Returns a release function.
- * While the lock is held, subsequent callers will wait.
- */
-function acquireSigningLock(): { ready: Promise<void>; release: () => void } {
-  let release: () => void;
-  const next = new Promise<void>((resolve) => { release = resolve; });
-  const ready = _signingLock.then(() => {});
-  _signingLock = _signingLock.then(() => next);
-  return { ready, release: release! };
-}
-
-/**
- * Execute `fn` while holding the global signing lock.
- * The lock is automatically released after `fn` settles (resolves or rejects).
- */
-async function withSigningLock<T>(fn: () => Promise<T>): Promise<T> {
-  const lock = acquireSigningLock();
-  await lock.ready;
-  try {
-    return await fn();
-  } finally {
-    lock.release();
-  }
-}
-
 /**
  * Create a fresh pipeline with the given steps.
  */
@@ -251,7 +214,7 @@ export async function udtLeapToBtc(
 
     // Step 1: Sign & Broadcast BTC TX (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 1, onUpdate);
-    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
     pipeline = completeStep(pipeline, 1, onUpdate, {
       txHash: btcTxId,
       detail: `BTC TX: ${btcTxId}`,
@@ -315,7 +278,7 @@ export async function udtLeapToBtc(
 
     // Step 5: Sign CKB Transaction (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 5, onUpdate);
-    const signedTx = await withSigningLock(() => signer.signTransaction(txWithInputs));
+    const signedTx = await signer.signTransaction(txWithInputs);
     pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
     // Step 6: Broadcast to CKB
@@ -460,7 +423,7 @@ export async function resumeUdtLeapToBtc(
 
       // Step 5: Sign CKB Transaction (acquire signing lock for wallet popup)
       pipeline = activateStep(pipeline, 5, onUpdate);
-      const signedTx = await withSigningLock(() => signer.signTransaction(txWithInputs));
+      const signedTx = await signer.signTransaction(txWithInputs);
       pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
       // Step 6: Broadcast to CKB
@@ -572,11 +535,9 @@ export async function resumeUdtTransferOnBtc(
 
       // Sign RGB++ CKB tx (acquire signing lock for wallet popups)
       pipeline = activateStep(pipeline, 5, onUpdate);
-      const ckbFinalTx = await withSigningLock(async () => {
-        const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-        await rgbppSignedCkbTx.completeFeeBy(signer);
-        return signer.signTransaction(rgbppSignedCkbTx);
-      });
+      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+      await rgbppSignedCkbTx.completeFeeBy(signer);
+      const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
       pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
       // Broadcast CKB
@@ -687,11 +648,9 @@ export async function resumeUdtLeapToCkb(
 
       // Sign RGB++ CKB tx (acquire signing lock for wallet popups)
       pipeline = activateStep(pipeline, 6, onUpdate);
-      const ckbFinalTx = await withSigningLock(async () => {
-        const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-        await rgbppSignedCkbTx.completeFeeBy(signer);
-        return signer.signTransaction(rgbppSignedCkbTx);
-      });
+      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+      await rgbppSignedCkbTx.completeFeeBy(signer);
+      const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
       pipeline = completeStep(pipeline, 6, onUpdate, { chain: 'ckb' });
 
       // Broadcast CKB
@@ -822,7 +781,7 @@ export async function udtTransferOnBtc(
 
     // Step 3: Sign & Broadcast BTC TX (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 3, onUpdate);
-    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
     pipeline = completeStep(pipeline, 3, onUpdate, {
       txHash: btcTxId,
       chain: 'btc',
@@ -854,11 +813,9 @@ export async function udtTransferOnBtc(
 
     // Step 5: Sign RGB++ CKB Transaction (acquire signing lock for wallet popups)
     pipeline = activateStep(pipeline, 5, onUpdate);
-    const ckbFinalTx = await withSigningLock(async () => {
-      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-      await rgbppSignedCkbTx.completeFeeBy(signer);
-      return signer.signTransaction(rgbppSignedCkbTx);
-    });
+    const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+    await rgbppSignedCkbTx.completeFeeBy(signer);
+    const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
     pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
     // Step 6: Broadcast to CKB
@@ -1004,7 +961,7 @@ export async function udtLeapToCkb(
 
     // Step 4: Sign & Broadcast BTC TX (acquire signing lock for wallet popup)
     pipeline = activateStep(pipeline, 4, onUpdate);
-    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
     pipeline = completeStep(pipeline, 4, onUpdate, {
       txHash: btcTxId,
       chain: 'btc',
@@ -1035,11 +992,9 @@ export async function udtLeapToCkb(
 
     // Step 6: Sign RGB++ CKB Transaction (acquire signing lock for wallet popups)
     pipeline = activateStep(pipeline, 6, onUpdate);
-    const ckbFinalTx = await withSigningLock(async () => {
-      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-      await rgbppSignedCkbTx.completeFeeBy(signer);
-      return signer.signTransaction(rgbppSignedCkbTx);
-    });
+    const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+    await rgbppSignedCkbTx.completeFeeBy(signer);
+    const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
     pipeline = completeStep(pipeline, 6, onUpdate, { chain: 'ckb' });
 
     // Step 7: Broadcast to CKB
@@ -1154,7 +1109,7 @@ export async function sporeLeapToBtc(
 
     // Step 1: Sign & Broadcast BTC TX
     pipeline = activateStep(pipeline, 1, onUpdate);
-    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
     pipeline = completeStep(pipeline, 1, onUpdate, {
       txHash: btcTxId,
       detail: `BTC TX: ${btcTxId}`,
@@ -1204,7 +1159,7 @@ export async function sporeLeapToBtc(
 
     // Step 6: Sign CKB Transaction
     pipeline = activateStep(pipeline, 6, onUpdate);
-    const signedTx = await withSigningLock(() => signer.signTransaction(tx));
+    const signedTx = await signer.signTransaction(tx);
     pipeline = completeStep(pipeline, 6, onUpdate, { chain: 'ckb' });
 
     // Step 7: Broadcast to CKB
@@ -1333,7 +1288,7 @@ export async function sporeTransferOnBtc(
 
     // Step 2: Sign & Broadcast BTC TX
     pipeline = activateStep(pipeline, 2, onUpdate);
-    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
     pipeline = completeStep(pipeline, 2, onUpdate, {
       txHash: btcTxId,
       chain: 'btc',
@@ -1361,11 +1316,9 @@ export async function sporeTransferOnBtc(
 
     // Step 4: Sign RGB++ CKB Transaction
     pipeline = activateStep(pipeline, 4, onUpdate);
-    const ckbFinalTx = await withSigningLock(async () => {
-      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-      await rgbppSignedCkbTx.completeFeeBy(signer);
-      return signer.signTransaction(rgbppSignedCkbTx);
-    });
+    const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+    await rgbppSignedCkbTx.completeFeeBy(signer);
+    const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
     pipeline = completeStep(pipeline, 4, onUpdate, { chain: 'ckb' });
 
     // Step 5: Broadcast to CKB
@@ -1491,7 +1444,7 @@ export async function sporeLeapToCkb(
 
     // Step 3: Sign & Broadcast BTC TX
     pipeline = activateStep(pipeline, 3, onUpdate);
-    const btcTxId = await withSigningLock(() => rgbppBtcWallet.signAndBroadcast(psbt));
+    const btcTxId = await rgbppBtcWallet.signAndBroadcast(psbt);
     pipeline = completeStep(pipeline, 3, onUpdate, {
       txHash: btcTxId,
       chain: 'btc',
@@ -1519,11 +1472,9 @@ export async function sporeLeapToCkb(
 
     // Step 5: Sign RGB++ CKB Transaction
     pipeline = activateStep(pipeline, 5, onUpdate);
-    const ckbFinalTx = await withSigningLock(async () => {
-      const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
-      await rgbppSignedCkbTx.completeFeeBy(signer);
-      return signer.signTransaction(rgbppSignedCkbTx);
-    });
+    const rgbppSignedCkbTx = await ckbRgbppUnlockSigner.signTransaction(ckbPartialTxInjected);
+    await rgbppSignedCkbTx.completeFeeBy(signer);
+    const ckbFinalTx = await signer.signTransaction(rgbppSignedCkbTx);
     pipeline = completeStep(pipeline, 5, onUpdate, { chain: 'ckb' });
 
     // Step 6: Broadcast to CKB
