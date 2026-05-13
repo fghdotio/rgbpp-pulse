@@ -1,67 +1,158 @@
 "use client";
 
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Plus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useApp } from "@/lib/context/app-context";
+import { useEffect, useState, useCallback } from "react";
+import { getRecommendedFees, getBtcInfo } from "@/lib/services/api";
 
-const actions = [
-  {
-    label: "Leap to BTC",
-    description: "Transfer assets to Bitcoin",
-    icon: ArrowUpRight,
-    href: "/tokens?action=leap-to-btc",
-    color: "text-success",
-  },
-  {
-    label: "Leap to CKB",
-    description: "Transfer assets to CKB",
-    icon: ArrowDownLeft,
-    href: "/tokens?action=leap-to-ckb",
-    color: "text-chart-2",
-  },
-  {
-    label: "Transfer on BTC",
-    description: "Transfer RGB++ on Bitcoin",
-    icon: ArrowLeftRight,
-    href: "/tokens?action=transfer-on-btc",
-    color: "text-warning",
-  },
-  {
-    label: "Mint DOB",
-    description: "Create new DOB asset",
-    icon: Plus,
-    href: "/dobs?action=mint",
-    color: "text-chart-4",
-  },
-];
+interface NetworkInfo {
+  btcFeeRate: number | null;
+  btcBlockHeight: number | null;
+  ckbTipNumber: string | null;
+  ckbFeeRate: string | null;
+  loading: boolean;
+  error: boolean;
+}
+
+function useNetworkStatus() {
+  const { client } = useApp();
+  const [info, setInfo] = useState<NetworkInfo>({
+    btcFeeRate: null,
+    btcBlockHeight: null,
+    ckbTipNumber: null,
+    ckbFeeRate: null,
+    loading: true,
+    error: false,
+  });
+
+  const refresh = useCallback(async () => {
+    setInfo((prev) => ({ ...prev, loading: true, error: false }));
+    try {
+      const [fees, btcInfo, ckbTipResult, ckbFeeResult] = await Promise.allSettled([
+        getRecommendedFees(),
+        getBtcInfo(),
+        // CKB tip block via CCC client's getTip()
+        client ? client.getTip() : Promise.resolve(null),
+        // CKB fee rate via CCC client's getFeeRateStatistics()
+        client
+          ? client.getFeeRateStatistics().then((r) => {
+            if (r?.median != null) {
+              return Number(r.median);
+            }
+            return null;
+          })
+          : Promise.resolve(null),
+      ]);
+
+      setInfo({
+        btcFeeRate: fees.status === "fulfilled" ? fees.value.halfHourFee : null,
+        btcBlockHeight: btcInfo.status === "fulfilled" ? btcInfo.value.blocks : null,
+        ckbTipNumber:
+          ckbTipResult.status === "fulfilled" && ckbTipResult.value != null
+            ? Number(ckbTipResult.value).toLocaleString()
+            : null,
+        ckbFeeRate:
+          ckbFeeResult.status === "fulfilled" && ckbFeeResult.value != null
+            ? `${ckbFeeResult.value}`
+            : null,
+        loading: false,
+        error: false,
+      });
+    } catch {
+      setInfo((prev) => ({ ...prev, loading: false, error: true }));
+    }
+  }, [client]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { info, refresh };
+}
+
+function MetricRow({
+  label,
+  value,
+  loading,
+}: {
+  label: string;
+  value: string | null;
+  loading: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-mono font-medium">
+        {loading ? (
+          <Loader2 className="size-3 animate-spin inline" />
+        ) : value !== null ? (
+          value
+        ) : (
+          <span className="text-muted-foreground">–</span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 export function QuickActions() {
   const { isConnected } = useApp();
+  const { info } = useNetworkStatus();
 
   if (!isConnected) return null;
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg">Quick Actions</CardTitle>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Network Status</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {actions.map((action) => (
-          <Link
-            key={action.label}
-            href={action.href}
-            className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors group"
-          >
-            <div className="size-10 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-              <action.icon className={`size-5 ${action.color}`} />
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Bitcoin */}
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2">
+              <div className="size-2 rounded-full bg-warning" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Bitcoin
+              </span>
             </div>
-            <div>
-              <p className="font-medium text-sm">{action.label}</p>
-              <p className="text-xs text-muted-foreground">{action.description}</p>
+            <div className="pl-4 space-y-1.5">
+              <MetricRow
+                label="Tip Block"
+                value={info.btcBlockHeight !== null ? `#${info.btcBlockHeight.toLocaleString()}` : null}
+                loading={info.loading}
+              />
+              <MetricRow
+                label="Fee Rate"
+                value={info.btcFeeRate !== null ? `~${info.btcFeeRate} sat/vB` : null}
+                loading={info.loading}
+              />
             </div>
-          </Link>
-        ))}
+          </div>
+
+          {/* CKB */}
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2">
+              <div className="size-2 rounded-full bg-chart-2" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                CKB
+              </span>
+            </div>
+            <div className="pl-4 space-y-1.5">
+              <MetricRow
+                label="Tip Block"
+                value={info.ckbTipNumber !== null ? `#${info.ckbTipNumber}` : null}
+                loading={info.loading}
+              />
+              <MetricRow
+                label="Fee Rate"
+                value={info.ckbFeeRate !== null ? `~${Number(info.ckbFeeRate).toLocaleString()} shannons/KB` : null}
+                loading={info.loading}
+              />
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

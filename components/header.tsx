@@ -70,9 +70,18 @@ export function Header() {
                   <div className="p-3 pb-0">
                     <p className="text-xs text-muted-foreground mb-1.5">BTC Address</p>
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
-                      <span className="text-sm font-mono truncate flex-1">
-                        {truncateAddress(btcAddress, 10, 8)}
-                      </span>
+                      <a
+                        href={btcExplorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-1 flex-1 min-w-0 hover:text-primary transition-colors"
+                        title="View on Mempool"
+                      >
+                        <span className="text-sm font-mono truncate">
+                          {truncateAddress(btcAddress, 10, 8)}
+                        </span>
+                        <ExternalLink className="size-3 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </a>
                       <button
                         onClick={() => copyToClipboard(btcAddress, "btc")}
                         className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -84,17 +93,6 @@ export function Header() {
                           <Copy className="size-3.5" />
                         )}
                       </button>
-                      {btcExplorerUrl && (
-                        <a
-                          href={btcExplorerUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-                          title="View on Mempool"
-                        >
-                          <ExternalLink className="size-3.5" />
-                        </a>
-                      )}
                     </div>
                   </div>
                 )}
@@ -103,9 +101,18 @@ export function Header() {
                 <div className="p-3">
                   <p className="text-xs text-muted-foreground mb-1.5">CKB Address</p>
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
-                    <span className="text-sm font-mono truncate flex-1">
-                      {truncateAddress(walletAddress || "", 10, 8)}
-                    </span>
+                    <a
+                      href={ckbExplorerUrl || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-1 flex-1 min-w-0 hover:text-primary transition-colors"
+                      title="View on CKB Explorer"
+                    >
+                      <span className="text-sm font-mono truncate">
+                        {truncateAddress(walletAddress || "", 10, 8)}
+                      </span>
+                      <ExternalLink className="size-3 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </a>
                     <button
                       onClick={() => copyToClipboard(walletAddress || "", "ckb")}
                       className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -117,17 +124,6 @@ export function Header() {
                         <Copy className="size-3.5" />
                       )}
                     </button>
-                    {ckbExplorerUrl && (
-                      <a
-                        href={ckbExplorerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-                        title="View on CKB Explorer"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    )}
                   </div>
                 </div>
 

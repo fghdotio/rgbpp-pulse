@@ -200,6 +200,20 @@ export async function getRecommendedFees(): Promise<{
   return fetchApi(`/bitcoin/v1/fees/recommended`);
 }
 
+/**
+ * Get BTC chain info (tip block height, etc.)
+ * GET /bitcoin/v1/info
+ */
+export async function getBtcInfo(): Promise<{
+  chain: string;
+  blocks: number;
+  bestblockhash: string;
+  difficulty: number;
+  mediantime: number;
+}> {
+  return fetchApi(`/bitcoin/v1/info`);
+}
+
 // ─── Activity Types ─────────────────────────────────────────
 
 /** BTC transaction status from activity endpoint */
