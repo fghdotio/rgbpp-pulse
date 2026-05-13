@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAssets } from "@/lib/context/assets-context";
 
 export function TokenActions() {
+  const { refresh } = useAssets();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Simulate refresh
+    refresh();
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 

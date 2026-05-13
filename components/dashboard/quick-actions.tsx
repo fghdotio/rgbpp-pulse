@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Plus } from "lucide-react";
+import { useApp } from "@/lib/context/app-context";
 
 const actions = [
   {
@@ -36,6 +37,10 @@ const actions = [
 ];
 
 export function QuickActions() {
+  const { isConnected } = useApp();
+
+  if (!isConnected) return null;
+
   return (
     <Card className="h-full">
       <CardHeader className="pb-4">

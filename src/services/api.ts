@@ -139,10 +139,19 @@ export async function getAddressBalance(btcAddress: string): Promise<AddressBala
 /**
  * Get RGB++ asset type info by type script.
  * GET /rgbpp/v1/assets/type?type_script=...
+ * Results are cached in-memory to avoid redundant requests.
  */
+const assetTypeInfoCache = new Map<string, AssetTypeInfo>();
+
 export async function getAssetTypeInfo(typeScript: CkbScript): Promise<AssetTypeInfo> {
+  const cacheKey = `${typeScript.codeHash}:${typeScript.hashType}:${typeScript.args}`;
+  const cached = assetTypeInfoCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const encoded = encodeURIComponent(JSON.stringify(typeScript));
-  return fetchApi<AssetTypeInfo>(`/rgbpp/v1/assets/type?type_script=${encoded}`);
+  const result = await fetchApi<AssetTypeInfo>(`/rgbpp/v1/assets/type?type_script=${encoded}`);
+  assetTypeInfoCache.set(cacheKey, result);
+  return result;
 }
 
 /**

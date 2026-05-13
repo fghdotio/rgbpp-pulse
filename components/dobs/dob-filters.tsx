@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Grid3X3, List } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAssets } from "@/lib/context/assets-context";
 
 export function DobFilters() {
+  const { refresh } = useAssets();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState<"all" | "rgbpp" | "ckb">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
+    refresh();
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 

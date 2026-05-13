@@ -9,7 +9,7 @@ export default function DobsPage() {
         {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold text-foreground">DOBs</h1>
-          <p className="text-muted-foreground">Your Spore DOB collection across CKB and Bitcoin</p>
+          <p className="text-muted-foreground">Your DOB collection across Bitcoin and CKB</p>
         </div>
 
         {/* Filters */}
