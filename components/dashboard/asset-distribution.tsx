@@ -46,7 +46,8 @@ function summarizeTokens(
 
 export function AssetDistribution() {
   const { isConnected } = useApp();
-  const { udtAssets, sporeAssets, loading, enrichingDobs } = useAssets();
+  const { udtAssets, sporeAssets, udtLoading, sporeLoading, enrichingDobs } = useAssets();
+  const loading = udtLoading || sporeLoading;
 
   const tokens = useMemo(() => summarizeTokens(udtAssets), [udtAssets]);
 

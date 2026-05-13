@@ -56,7 +56,7 @@ function inferTxType(tx: ActivityTransaction): keyof typeof typeConfig {
 
 export function RecentActivity() {
   const { isConnected } = useApp();
-  const { recentActivity, loading } = useAssets();
+  const { recentActivity, activityLoading: loading } = useAssets();
 
   if (!isConnected) return null;
 

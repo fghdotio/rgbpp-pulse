@@ -26,7 +26,7 @@ interface DobGridProps {
 
 export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
   const { isConnected } = useApp();
-  const { sporeAssets, loading, enrichingDobs } = useAssets();
+  const { sporeAssets, sporeLoading: loading, enrichingDobs } = useAssets();
 
   const filteredAssets = useMemo(() => {
     let result: typeof sporeAssets;

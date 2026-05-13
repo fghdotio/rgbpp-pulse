@@ -51,7 +51,7 @@ function mergeTokensByType(assets: UdtAsset[]): MergedToken[] {
 
 export function TokenList() {
   const { isConnected } = useApp();
-  const { udtAssets, loading } = useAssets();
+  const { udtAssets, udtLoading: loading } = useAssets();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "rgbpp" | "ckb">("all");

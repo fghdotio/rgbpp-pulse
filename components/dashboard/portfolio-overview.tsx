@@ -44,7 +44,8 @@ function CkbIcon({ className }: { className?: string }) {
 
 export function PortfolioOverview() {
   const { isConnected, openConnector } = useApp();
-  const { udtAssets, sporeAssets, loading } = useAssets();
+  const { udtAssets, sporeAssets, udtLoading, sporeLoading } = useAssets();
+  const loading = udtLoading || sporeLoading;
 
   if (!isConnected) {
     return (

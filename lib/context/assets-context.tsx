@@ -24,8 +24,12 @@ interface AssetsContextValue {
   sporeAssets: SporeAsset[];
   /** Recent RGB++ transactions */
   recentActivity: ActivityTransaction[];
-  /** Whether assets are currently loading */
-  loading: boolean;
+  /** Whether UDT tokens are loading */
+  udtLoading: boolean;
+  /** Whether Spore/DOB assets are loading */
+  sporeLoading: boolean;
+  /** Whether activity data is loading */
+  activityLoading: boolean;
   /** Whether DOB enrichment is in progress */
   enrichingDobs: boolean;
   /** Error message if loading failed */
@@ -42,7 +46,9 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
   const [udtAssets, setUdtAssets] = useState<UdtAsset[]>([]);
   const [sporeAssets, setSporeAssets] = useState<SporeAsset[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityTransaction[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [udtLoading, setUdtLoading] = useState(false);
+  const [sporeLoading, setSporeLoading] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [enrichingDobs, setEnrichingDobs] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -61,53 +67,68 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    setLoading(true);
     setError(null);
 
-    const loadAssets = async () => {
-      try {
-        // Fetch UDTs, Spores, and Activity in parallel
-        const [udts, spores, activity] = await Promise.all([
-          fetchUdtAssets(btcAddress, client, signer),
-          btcAddress
-            ? fetchSporeAssets(btcAddress, client, signer)
-            : Promise.resolve([]),
-          btcAddress
-            ? getAddressActivity(btcAddress, { rgbppOnly: true })
-                .then((r) => r.txs.slice(0, 10))
-                .catch(() => [] as ActivityTransaction[])
-            : Promise.resolve([] as ActivityTransaction[]),
-        ]);
-
-        if (cancelled) return;
-
-        setUdtAssets(udts);
-        setSporeAssets(spores);
-        setRecentActivity(activity);
-
-        // Enrich DOBs asynchronously (phase 2)
-        if (spores.length > 0) {
-          setEnrichingDobs(true);
-          try {
-            const enriched = await enrichSporesWithDob(spores);
-            if (!cancelled) {
-              setSporeAssets([...enriched]);
-            }
-          } finally {
-            if (!cancelled) setEnrichingDobs(false);
-          }
-        }
-      } catch (err) {
+    // ── UDT fetch (independent) ──────────────────────
+    setUdtLoading(true);
+    fetchUdtAssets(btcAddress, client, signer)
+      .then((udts) => {
+        if (!cancelled) setUdtAssets(udts);
+      })
+      .catch((err) => {
         if (!cancelled) {
-          console.warn("Failed to load assets:", err);
-          setError(err instanceof Error ? err.message : "Failed to load assets");
+          console.warn("Failed to load UDT assets:", err);
+          setError(err instanceof Error ? err.message : "Failed to load UDT assets");
         }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
+      })
+      .finally(() => {
+        if (!cancelled) setUdtLoading(false);
+      });
 
-    loadAssets();
+    // ── Spore fetch (independent, with DOB enrichment phase 2) ──
+    if (btcAddress) {
+      setSporeLoading(true);
+      fetchSporeAssets(btcAddress, client, signer)
+        .then(async (spores) => {
+          if (cancelled) return;
+          setSporeAssets(spores);
+
+          // Enrich DOBs asynchronously (phase 2)
+          if (spores.length > 0) {
+            setEnrichingDobs(true);
+            try {
+              const enriched = await enrichSporesWithDob(spores);
+              if (!cancelled) setSporeAssets([...enriched]);
+            } finally {
+              if (!cancelled) setEnrichingDobs(false);
+            }
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            console.warn("Failed to load Spore assets:", err);
+            setError(err instanceof Error ? err.message : "Failed to load Spore assets");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setSporeLoading(false);
+        });
+    }
+
+    // ── Activity fetch (independent) ─────────────────
+    if (btcAddress) {
+      setActivityLoading(true);
+      getAddressActivity(btcAddress, { rgbppOnly: true })
+        .then((r) => {
+          if (!cancelled) setRecentActivity(r.txs.slice(0, 10));
+        })
+        .catch(() => {
+          if (!cancelled) setRecentActivity([]);
+        })
+        .finally(() => {
+          if (!cancelled) setActivityLoading(false);
+        });
+    }
 
     return () => {
       cancelled = true;
@@ -120,7 +141,9 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
         udtAssets,
         sporeAssets,
         recentActivity,
-        loading,
+        udtLoading,
+        sporeLoading,
+        activityLoading,
         enrichingDobs,
         error,
         refresh,
