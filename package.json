@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "1.1.1",
@@ -14,8 +14,8 @@
     "@ckb-ccc/core": "file:./vendor/ckb-ccc-core-1.12.4.tgz",
     "@ckb-ccc/dob-render": "0.0.0-canary-20251012152410",
     "@ckb-ccc/rgbpp": "file:./vendor/ckb-ccc-rgbpp-1.0.0.tgz",
-    "@ckb-ccc/spore": "file:./vendor/ckb-ccc-spore-1.5.16.tgz",
     "@ckb-ccc/shell": "file:./vendor/ckb-ccc-shell-1.1.24.tgz",
+    "@ckb-ccc/spore": "file:./vendor/ckb-ccc-spore-1.5.16.tgz",
     "@ckb-ccc/udt": "file:./vendor/ckb-ccc-udt-0.1.23.tgz",
     "bitcoinjs-lib": "7.0.1",
     "buffer": "^6.0.3",
@@ -31,10 +31,13 @@
     "tailwind-merge": "^3.3.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4.1.7",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "15.5.18",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.8.3"
   },
