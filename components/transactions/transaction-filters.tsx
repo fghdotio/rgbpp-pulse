@@ -2,15 +2,23 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
-type StatusFilter = "all" | "active" | "completed" | "error";
-type OperationFilter = "all" | "leap-to-btc" | "transfer-on-btc" | "leap-to-ckb";
+export type StatusFilter = "all" | "confirmed" | "pending";
+export type OperationFilter = "all" | "leap-to-btc" | "transfer-on-btc" | "leap-to-ckb";
 
-export function TransactionFilters() {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [operationFilter, setOperationFilter] = useState<OperationFilter>("all");
+interface TransactionFiltersProps {
+  statusFilter: StatusFilter;
+  onStatusFilterChange: (f: StatusFilter) => void;
+  operationFilter: OperationFilter;
+  onOperationFilterChange: (f: OperationFilter) => void;
+}
 
+export function TransactionFilters({
+  statusFilter,
+  onStatusFilterChange,
+  operationFilter,
+  onOperationFilterChange,
+}: TransactionFiltersProps) {
   return (
     <Card>
       <CardContent className="p-4">
@@ -19,12 +27,12 @@ export function TransactionFilters() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Status:</span>
             <div className="flex gap-1">
-              {(["all", "active", "completed", "error"] as StatusFilter[]).map((status) => (
+              {(["all", "confirmed", "pending"] as StatusFilter[]).map((status) => (
                 <Button
                   key={status}
                   variant={statusFilter === status ? "secondary" : "ghost"}
                   size="sm"
-                  onClick={() => setStatusFilter(status)}
+                  onClick={() => onStatusFilterChange(status)}
                   className={statusFilter === status ? "bg-primary/15 text-primary" : ""}
                 >
                   {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -37,38 +45,22 @@ export function TransactionFilters() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Operation:</span>
             <div className="flex gap-1">
-              <Button
-                variant={operationFilter === "all" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setOperationFilter("all")}
-                className={operationFilter === "all" ? "bg-primary/15 text-primary" : ""}
-              >
-                All
-              </Button>
-              <Button
-                variant={operationFilter === "leap-to-btc" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setOperationFilter("leap-to-btc")}
-                className={operationFilter === "leap-to-btc" ? "bg-primary/15 text-primary" : ""}
-              >
-                Leap to BTC
-              </Button>
-              <Button
-                variant={operationFilter === "transfer-on-btc" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setOperationFilter("transfer-on-btc")}
-                className={operationFilter === "transfer-on-btc" ? "bg-primary/15 text-primary" : ""}
-              >
-                Transfer
-              </Button>
-              <Button
-                variant={operationFilter === "leap-to-ckb" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setOperationFilter("leap-to-ckb")}
-                className={operationFilter === "leap-to-ckb" ? "bg-primary/15 text-primary" : ""}
-              >
-                Leap to CKB
-              </Button>
+              {([
+                { key: "all" as const, label: "All" },
+                { key: "leap-to-btc" as const, label: "Leap to BTC" },
+                { key: "transfer-on-btc" as const, label: "Transfer on BTC" },
+                { key: "leap-to-ckb" as const, label: "Leap to CKB" },
+              ]).map(({ key, label }) => (
+                <Button
+                  key={key}
+                  variant={operationFilter === key ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => onOperationFilterChange(key)}
+                  className={operationFilter === key ? "bg-primary/15 text-primary" : ""}
+                >
+                  {label}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
