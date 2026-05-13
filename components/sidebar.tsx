@@ -24,7 +24,7 @@ const navigation = [
 
 const externalLinks = [
   { name: "CKB Explorer", href: "https://explorer.nervos.org/", icon: ExternalLink },
-  { name: "RGB++ Docs", href: "https://docs.rgbpp.io/", icon: ExternalLink },
+  { name: "RGB++ Docs", href: "https://rgbpp.com/docs/introduction", icon: ExternalLink },
 ];
 
 export function Sidebar() {

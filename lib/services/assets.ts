@@ -105,8 +105,11 @@ export async function fetchCkbUdtAssets(
     }
 
     // Convert to UdtAsset array, enriching with metadata from the API
+    // Skip zero-balance entries (leftover empty cells from previous transactions)
     const assets: UdtAsset[] = [];
     for (const [, info] of balanceMap) {
+      if (info.balance <= BigInt(0)) continue;
+
       let name = `xUDT ${info.typeScriptArgs.slice(0, 10)}...`;
       let symbol = info.typeScriptArgs.slice(2, 8).toUpperCase();
       let decimals = 8;
@@ -198,8 +201,11 @@ export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[
     }
 
     // Convert to UdtAsset array, enriching with metadata
+    // Skip zero-balance entries (leftover empty cells from previous transactions)
     const assets: UdtAsset[] = [];
     for (const [, info] of balanceMap) {
+      if (info.balance <= BigInt(0)) continue;
+
       let name = `xUDT ${info.typeScript.args.slice(0, 10)}...`;
       let symbol = info.typeScript.args.slice(2, 8).toUpperCase();
       let decimals = 8;

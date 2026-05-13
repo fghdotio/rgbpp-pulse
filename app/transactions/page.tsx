@@ -23,7 +23,7 @@ export default function TransactionsPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
             <p className="text-muted-foreground">
-              Your RGB++ transaction history on Bitcoin
+              Your RGB++ transaction history
             </p>
           </div>
           <RefreshButton />
