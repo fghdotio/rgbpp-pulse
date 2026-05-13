@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
 import { formatBalance, truncateAddress, cn } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check, Loader2, RefreshCw } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Coins, Copy, Check, Loader2 } from "lucide-react";
 import type { UdtAsset } from "@/lib/services/types";
 import { TransactionDialog, type TxDialogOperation } from "./transaction-dialog";
 
@@ -50,11 +50,10 @@ function mergeTokensByType(assets: UdtAsset[]): MergedToken[] {
 
 export function TokenList() {
   const { isConnected } = useApp();
-  const { udtAssets, loading, refresh } = useAssets();
+  const { udtAssets, loading } = useAssets();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "rgbpp" | "ckb">("all");
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [txDialogToken, setTxDialogToken] = useState<UdtAsset | null>(null);
   const [txDialogOp, setTxDialogOp] = useState<TxDialogOperation>("leap-to-btc");
   const [txDialogOpen, setTxDialogOpen] = useState(false);
@@ -73,11 +72,7 @@ export function TokenList() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    refresh();
-    setTimeout(() => setIsRefreshing(false), 1000);
-  };
+
 
   if (!isConnected) {
     return (
@@ -140,9 +135,6 @@ export function TokenList() {
                 </Button>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} /> Refresh
-            </Button>
           </div>
         </CardContent>
       </Card>

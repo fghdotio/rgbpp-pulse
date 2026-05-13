@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,21 @@ import { truncateAddress } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownLeft, Image as ImageIcon, ExternalLink, Loader2 } from "lucide-react";
 import type { SporeAsset } from "@/lib/services/types";
 import { SporeTransactionDialog, type SporeDialogOperation } from "./spore-transaction-dialog";
+import type { DobChainFilter } from "@/lib/services/types";
 
-export function DobGrid() {
+interface DobGridProps {
+  filter: DobChainFilter;
+}
+
+export function DobGrid({ filter }: DobGridProps) {
   const { isConnected } = useApp();
   const { sporeAssets, loading, enrichingDobs } = useAssets();
+
+  const filteredAssets = useMemo(() => {
+    if (filter === "all") return sporeAssets;
+    if (filter === "rgbpp") return sporeAssets.filter((s) => s.location === "btc");
+    return sporeAssets.filter((s) => s.location === "ckb");
+  }, [sporeAssets, filter]);
   const [selectedDob, setSelectedDob] = useState<SporeAsset | null>(null);
   const [txDialogSpore, setTxDialogSpore] = useState<SporeAsset | null>(null);
   const [txDialogOp, setTxDialogOp] = useState<SporeDialogOperation>("leap-to-btc");
@@ -60,6 +71,16 @@ export function DobGrid() {
     );
   }
 
+  if (filteredAssets.length === 0) {
+    return (
+      <Card>
+        <CardContent className="text-center py-12 text-muted-foreground text-sm">
+          No {filter === "rgbpp" ? "RGB++" : "CKB"} DOBs found
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       {enrichingDobs && (
@@ -70,7 +91,7 @@ export function DobGrid() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {sporeAssets.map((dob) => (
+        {filteredAssets.map((dob) => (
           <Card
             key={dob.id}
             className={`overflow-hidden cursor-pointer transition-all hover:border-primary/50 ${selectedDob?.id === dob.id ? "border-primary ring-1 ring-primary" : ""}`}

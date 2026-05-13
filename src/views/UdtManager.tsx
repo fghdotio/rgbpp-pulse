@@ -10,7 +10,7 @@ import type { RgbppOperation, UdtAsset, TransactionPipeline } from '../services/
 import { Coins, Search, Loader2 } from 'lucide-react';
 
 /**
- * UDT Manager — shows all UDTs (both CKB-native and RGB++-bound).
+ * UDT Manager — shows all UDTs (both CKB and RGB++-bound).
  */
 export function UdtManager() {
   const { isConnected, walletAddress, btcAddress, signer, client, setView } = useApp();

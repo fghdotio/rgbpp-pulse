@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { TokenList } from "@/components/tokens/token-list";
-import { TokenActions } from "@/components/tokens/token-actions";
+import { RefreshButton } from "@/components/ui/refresh-button";
 
 export default function TokensPage() {
   return (
@@ -12,7 +12,7 @@ export default function TokensPage() {
             <h1 className="text-2xl font-bold text-foreground">Tokens</h1>
             <p className="text-muted-foreground">Your UDT tokens across Bitcoin and CKB</p>
           </div>
-          <TokenActions />
+          <RefreshButton />
         </div>
 
         {/* Token List */}

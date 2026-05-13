@@ -2,87 +2,53 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Grid3X3, List } from "lucide-react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import { useAssets } from "@/lib/context/assets-context";
+import type { DobChainFilter } from "@/lib/services/types";
 
-export function DobFilters() {
-  const { refresh } = useAssets();
-  const [view, setView] = useState<"grid" | "list">("grid");
-  const [filter, setFilter] = useState<"all" | "rgbpp" | "ckb">("all");
-  const [isRefreshing, setIsRefreshing] = useState(false);
+interface DobFiltersProps {
+  filter: DobChainFilter;
+  onFilterChange: (filter: DobChainFilter) => void;
+}
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    refresh();
-    setTimeout(() => setIsRefreshing(false), 1000);
-  };
+export function DobFilters({ filter, onFilterChange }: DobFiltersProps) {
+  const { sporeAssets } = useAssets();
+
+  const counts = useMemo(() => {
+    const all = sporeAssets.length;
+    const rgbpp = sporeAssets.filter((s) => s.location === "btc").length;
+    const ckb = sporeAssets.filter((s) => s.location === "ckb").length;
+    return { all, rgbpp, ckb };
+  }, [sporeAssets]);
 
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Chain Filters */}
-          <div className="flex gap-2">
-            <Button
-              variant={filter === "all" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setFilter("all")}
-              className={filter === "all" ? "bg-primary/15 text-primary" : ""}
-            >
-              All DOBs
-            </Button>
-            <Button
-              variant={filter === "rgbpp" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setFilter("rgbpp")}
-              className={filter === "rgbpp" ? "bg-primary/15 text-primary" : ""}
-            >
-              RGB++
-            </Button>
-            <Button
-              variant={filter === "ckb" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setFilter("ckb")}
-              className={filter === "ckb" ? "bg-primary/15 text-primary" : ""}
-            >
-              CKB-Native
-            </Button>
-          </div>
-
-          {/* View Toggle & Refresh */}
-          <div className="flex items-center gap-2">
-            <div className="flex border border-border rounded-lg overflow-hidden">
-              <button
-                onClick={() => setView("grid")}
-                className={cn(
-                  "p-2 transition-colors",
-                  view === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Grid3X3 className="size-4" />
-              </button>
-              <button
-                onClick={() => setView("list")}
-                className={cn(
-                  "p-2 transition-colors",
-                  view === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <List className="size-4" />
-              </button>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />
-              Refresh
-            </Button>
-          </div>
+        <div className="flex gap-2">
+          <Button
+            variant={filter === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => onFilterChange("all")}
+            className={filter === "all" ? "bg-primary/15 text-primary" : ""}
+          >
+            All DOBs ({counts.all})
+          </Button>
+          <Button
+            variant={filter === "rgbpp" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => onFilterChange("rgbpp")}
+            className={filter === "rgbpp" ? "bg-primary/15 text-primary" : ""}
+          >
+            RGB++ ({counts.rgbpp})
+          </Button>
+          <Button
+            variant={filter === "ckb" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => onFilterChange("ckb")}
+            className={filter === "ckb" ? "bg-primary/15 text-primary" : ""}
+          >
+            CKB ({counts.ckb})
+          </Button>
         </div>
       </CardContent>
     </Card>

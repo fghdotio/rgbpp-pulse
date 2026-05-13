@@ -11,6 +11,9 @@ export type RgbppOperation =
 /** Asset location */
 export type AssetLocation = 'ckb' | 'btc';
 
+/** DOB chain filter */
+export type DobChainFilter = 'all' | 'rgbpp' | 'ckb';
+
 /** UDT asset representation */
 export interface UdtAsset {
   type: 'udt';

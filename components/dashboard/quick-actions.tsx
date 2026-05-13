@@ -108,12 +108,12 @@ export function QuickActions() {
         <CardTitle className="text-lg">Network Status</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 md:gap-6">
           {/* Bitcoin */}
           <div className="space-y-2.5">
             <div className="flex items-center gap-2">
-              <div className="size-2 rounded-full bg-warning" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="size-2 rounded-full bg-orange-500" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500/80">
                 Bitcoin
               </span>
             </div>
@@ -131,11 +131,15 @@ export function QuickActions() {
             </div>
           </div>
 
+          {/* Divider */}
+          <div className="hidden md:block w-px bg-border" />
+          <div className="md:hidden h-px bg-border" />
+
           {/* CKB */}
           <div className="space-y-2.5">
             <div className="flex items-center gap-2">
-              <div className="size-2 rounded-full bg-chart-2" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="size-2 rounded-full bg-emerald-500" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-500/80">
                 CKB
               </span>
             </div>

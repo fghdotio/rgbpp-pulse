@@ -54,12 +54,7 @@ export function Header() {
               <div className="size-6 rounded-full bg-primary/20 flex items-center justify-center">
                 <Wallet className="size-3.5 text-primary" />
               </div>
-              <div className="flex flex-col items-start">
-                <span className="text-xs text-muted-foreground">Connected</span>
-                <span className="text-sm font-medium">
-                  {truncateAddress(walletAddress || "", 4, 4)}
-                </span>
-              </div>
+              <span className="text-sm font-medium">Connected</span>
               <ChevronDown className="size-4 text-muted-foreground" />
             </button>
 
