@@ -498,6 +498,61 @@ export async function fetchCkbSporeAssets(
 }
 
 /**
+ * Async generator version of fetchCkbSporeAssets.
+ * Yields SporeAsset one by one, allowing the caller to pull items on demand
+ * for paginated loading (e.g. 20 items at a time).
+ */
+export async function* generateCkbSporeAssets(
+  client: ccc.Client,
+  signer: ccc.Signer,
+): AsyncGenerator<SporeAsset> {
+  try {
+    const addressObjs = await signer.getAddressObjs();
+
+    for (const codeHash of KNOWN_SPORE_CODE_HASHES) {
+      for (const { script: lockScript } of addressObjs) {
+        for await (const cell of client.findCells(
+          {
+            script: lockScript,
+            scriptType: 'lock',
+            scriptSearchMode: 'exact',
+            filter: {
+              script: {
+                codeHash,
+                hashType: 'data1',
+                args: '0x',
+              },
+            },
+            withData: true,
+          },
+          'desc',
+          20,
+        )) {
+          if (!cell.cellOutput.type) continue;
+
+          const typeArgs = cell.cellOutput.type.args;
+          const { contentType, clusterId } = parseSporeData(cell.outputData ?? '0x');
+          const clusterName = await lookupClusterName(client, clusterId);
+
+          yield {
+            type: 'spore' as const,
+            id: typeArgs,
+            contentType,
+            content: '',
+            clusterId,
+            clusterName,
+            capacity: cell.cellOutput.capacity.toString(),
+            location: 'ckb' as const,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to generate CKB Spore assets:', err);
+  }
+}
+
+/**
  * Fetch RGB++-bound Spore assets from the RGB++ API.
  */
 export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAsset[]> {

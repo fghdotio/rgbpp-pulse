@@ -1,9 +1,9 @@
 import { Buffer } from 'buffer';
 
-if (typeof (globalThis as any).Buffer === 'undefined') {
-  (globalThis as any).Buffer = Buffer;
+if (typeof (globalThis as unknown as Record<string, unknown>).Buffer === 'undefined') {
+  (globalThis as unknown as Record<string, unknown>).Buffer = Buffer;
 }
 
-if (typeof (globalThis as any).process === 'undefined') {
-  (globalThis as any).process = { env: {} } as unknown as NodeJS.Process;
+if (typeof (globalThis as unknown as Record<string, unknown>).process === 'undefined') {
+  (globalThis as unknown as Record<string, unknown>).process = { env: {} } as unknown as NodeJS.Process;
 }

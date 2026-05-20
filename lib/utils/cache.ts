@@ -13,7 +13,7 @@ const memoryCache = new Map<string, unknown>();
 
 /** Initialize memory cache from localStorage on first load */
 let initialized = false;
-function ensureInit(namespace: string) {
+function ensureInit() {
   if (initialized) return;
   initialized = true;
   try {
@@ -36,7 +36,7 @@ function ensureInit(namespace: string) {
 }
 
 export function cacheGet<T>(namespace: string, key: string): T | undefined {
-  ensureInit(namespace);
+  ensureInit();
   const fullKey = `${LS_PREFIX}${namespace}:${key}`;
 
   // Memory first

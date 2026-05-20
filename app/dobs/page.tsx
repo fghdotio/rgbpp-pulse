@@ -8,7 +8,7 @@ import { RefreshButton } from "@/components/ui/refresh-button";
 import type { DobChainFilter } from "@/lib/services/types";
 
 export default function DobsPage() {
-  const [filter, setFilter] = useState<DobChainFilter>("all");
+  const [filter, setFilter] = useState<DobChainFilter>("btc");
   const [searchQuery, setSearchQuery] = useState("");
 
   return (

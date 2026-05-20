@@ -88,7 +88,7 @@ export function UdtManager() {
 
       {/* Filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {([['all', 'All'], ['ckb', 'CKB'], ['rgbpp', 'RGB++']] as const).map(([key, label]) => (
+        {([['all', 'All'], ['ckb', 'CKB'], ['rgbpp', 'BTC']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setFilter(key)} style={{
             padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 600,
             background: filter === key ? 'var(--text-base)' : 'var(--bg-elevated)',

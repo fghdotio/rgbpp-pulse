@@ -3,8 +3,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMemo } from "react";
-import { useAssets } from "@/lib/context/assets-context";
 import { Search } from "lucide-react";
 import type { DobChainFilter } from "@/lib/services/types";
 
@@ -16,35 +14,18 @@ interface DobFiltersProps {
 }
 
 export function DobFilters({ filter, onFilterChange, searchQuery, onSearchChange }: DobFiltersProps) {
-  const { sporeAssets } = useAssets();
-
-  const counts = useMemo(() => {
-    const all = sporeAssets.length;
-    const rgbpp = sporeAssets.filter((s) => s.location === "btc").length;
-    const ckb = sporeAssets.filter((s) => s.location === "ckb").length;
-    return { all, rgbpp, ckb };
-  }, [sporeAssets]);
-
   return (
     <Card>
       <CardContent className="p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-2">
             <Button
-              variant={filter === "all" ? "secondary" : "ghost"}
+              variant={filter === "btc" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => onFilterChange("all")}
-              className={filter === "all" ? "bg-primary/15 text-primary" : ""}
+              onClick={() => onFilterChange("btc")}
+              className={filter === "btc" ? "bg-primary/15 text-primary" : ""}
             >
-              All DOBs ({counts.all})
-            </Button>
-            <Button
-              variant={filter === "rgbpp" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => onFilterChange("rgbpp")}
-              className={filter === "rgbpp" ? "bg-primary/15 text-primary" : ""}
-            >
-              RGB++ ({counts.rgbpp})
+              BTC
             </Button>
             <Button
               variant={filter === "ckb" ? "secondary" : "ghost"}
@@ -52,7 +33,7 @@ export function DobFilters({ filter, onFilterChange, searchQuery, onSearchChange
               onClick={() => onFilterChange("ckb")}
               className={filter === "ckb" ? "bg-primary/15 text-primary" : ""}
             >
-              CKB ({counts.ckb})
+              CKB
             </Button>
           </div>
 

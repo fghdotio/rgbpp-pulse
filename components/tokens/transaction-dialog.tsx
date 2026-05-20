@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/lib/context/app-context";
-import { formatBalance, truncateAddress, cn, getTokenInitial, getTokenColor } from "@/lib/utils";
+import { formatBalance, truncateAddress, getTokenInitial, getTokenColor } from "@/lib/utils";
 import {
   ArrowUpRight,
   ArrowDownLeft,

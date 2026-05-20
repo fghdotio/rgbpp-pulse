@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
+import { useCkbSporeAssets } from "@/lib/hooks/useCkbAssets";
 import { truncateAddress } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Image as ImageIcon, Loader2, Copy, Check } from "lucide-react";
 import type { SporeAsset } from "@/lib/services/types";
@@ -26,23 +27,29 @@ interface DobGridProps {
 
 export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
   const { isConnected } = useApp();
-  const { sporeAssets, sporeLoading: loading, enrichingDobs } = useAssets();
+  const { sporeAssets, sporeLoading: btcLoading, enrichingDobs } = useAssets();
+
+  // Lazy-load CKB Spores only when CKB filter is active
+  const {
+    assets: ckbSporeAssets,
+    loading: ckbLoading,
+    loadingMore: ckbLoadingMore,
+    hasMore: ckbHasMore,
+    loadMore: ckbLoadMore,
+  } = useCkbSporeAssets(filter === "ckb");
+
+  // Select data source based on active filter
+  const sourceAssets = filter === "btc" ? sporeAssets : ckbSporeAssets;
+  const loading = filter === "btc" ? btcLoading : ckbLoading;
 
   const filteredAssets = useMemo(() => {
-    let result: typeof sporeAssets;
-    if (filter === "all") result = [...sporeAssets].sort((a, b) => (a.location === "btc" ? -1 : 1) - (b.location === "btc" ? -1 : 1));
-    else if (filter === "rgbpp") result = sporeAssets.filter((s) => s.location === "btc");
-    else result = sporeAssets.filter((s) => s.location === "ckb");
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      result = result.filter((s) =>
-        (s.clusterName || "").toLowerCase().includes(q) ||
-        s.id.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [sporeAssets, filter, searchQuery]);
+    if (!searchQuery.trim()) return sourceAssets;
+    const q = searchQuery.trim().toLowerCase();
+    return sourceAssets.filter((s) =>
+      (s.clusterName || "").toLowerCase().includes(q) ||
+      s.id.toLowerCase().includes(q)
+    );
+  }, [sourceAssets, searchQuery]);
 
   const [detailDob, setDetailDob] = useState<SporeAsset | null>(null);
   const [copiedId, setCopiedId] = useState(false);
@@ -70,7 +77,7 @@ export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
     );
   }
 
-  if (loading) {
+  if (loading && sourceAssets.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
@@ -81,7 +88,7 @@ export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
     );
   }
 
-  if (sporeAssets.length === 0) {
+  if (sourceAssets.length === 0 && !loading) {
     return (
       <Card>
         <CardContent className="text-center py-12 text-muted-foreground text-sm">
@@ -95,7 +102,7 @@ export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
     return (
       <Card>
         <CardContent className="text-center py-12 text-muted-foreground text-sm">
-          No {filter === "rgbpp" ? "RGB++" : "CKB"} DOBs found
+          No {filter === "btc" ? "BTC" : "CKB"} DOBs found
         </CardContent>
       </Card>
     );
@@ -136,7 +143,7 @@ export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
                 </div>
               )}
               <Badge variant={dob.location === "ckb" ? "default" : "secondary"} className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0">
-                {dob.location === "btc" ? "RGB++" : "CKB"}
+                {dob.location === "btc" ? "BTC" : "CKB"}
               </Badge>
             </div>
 
@@ -160,6 +167,22 @@ export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
           </Card>
         ))}
       </div>
+
+      {/* ── Load More (CKB pagination) ────────────────── */}
+      {filter === "ckb" && ckbHasMore && !ckbLoadingMore && (
+        <div className="flex justify-center pt-4">
+          <Button variant="outline" size="sm" onClick={ckbLoadMore} className="gap-1.5">
+            Load More
+          </Button>
+        </div>
+      )}
+
+      {/* ── CKB loading more indicator ───────────────── */}
+      {ckbLoadingMore && (
+        <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Loading more DOBs…
+        </div>
+      )}
 
       {/* ── DOB Detail Modal ─────────────────────────── */}
       {detailDob && (
@@ -185,7 +208,7 @@ export function DobGrid({ filter, searchQuery = "" }: DobGridProps) {
                   </div>
                 )}
                 <Badge variant={detailDob.location === "ckb" ? "default" : "secondary"} className="absolute top-2 right-2">
-                  {detailDob.location === "btc" ? "RGB++" : "CKB"}
+                  {detailDob.location === "btc" ? "BTC" : "CKB"}
                 </Badge>
               </div>
 

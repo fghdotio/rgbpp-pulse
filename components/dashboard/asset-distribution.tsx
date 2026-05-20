@@ -1,10 +1,9 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Coins, Image as ImageIcon } from "lucide-react";
 import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
-import { formatBalance } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -49,7 +48,11 @@ export function AssetDistribution() {
   const { udtAssets, sporeAssets, udtLoading, sporeLoading, enrichingDobs } = useAssets();
   const loading = udtLoading || sporeLoading;
 
-  const tokens = useMemo(() => summarizeTokens(udtAssets), [udtAssets]);
+  // Only show RGB++ (BTC-bound) assets on Portfolio
+  const btcUdtAssets = useMemo(() => udtAssets.filter((a) => a.location === "btc"), [udtAssets]);
+  const btcSporeAssets = useMemo(() => sporeAssets.filter((a) => a.location === "btc"), [sporeAssets]);
+
+  const tokens = useMemo(() => summarizeTokens(btcUdtAssets), [btcUdtAssets]);
 
   if (!isConnected) return null;
 
@@ -64,7 +67,7 @@ export function AssetDistribution() {
   }
 
   const hasTokens = tokens.length > 0;
-  const hasDobs = sporeAssets.length > 0;
+  const hasDobs = btcSporeAssets.length > 0;
 
   if (!hasTokens && !hasDobs) {
     return (
@@ -122,7 +125,7 @@ export function AssetDistribution() {
           </div>
           {hasDobs ? (
             <div className="flex items-center gap-2 overflow-x-auto">
-              {sporeAssets.slice(0, 6).map((dob) => (
+              {btcSporeAssets.slice(0, 6).map((dob) => (
                 <div
                   key={dob.id}
                   className="size-12 rounded-lg bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border/50"
@@ -148,12 +151,12 @@ export function AssetDistribution() {
                   )}
                 </div>
               ))}
-              {sporeAssets.length > 6 && (
+              {btcSporeAssets.length > 6 && (
                 <Link
                   href="/dobs"
                   className="size-12 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border/50"
                 >
-                  +{sporeAssets.length - 6}
+                  +{btcSporeAssets.length - 6}
                 </Link>
               )}
             </div>

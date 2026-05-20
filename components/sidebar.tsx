@@ -7,7 +7,6 @@ import {
   Coins,
   Image,
   ArrowLeftRight,
-  Settings,
   ExternalLink,
   ChevronLeft,
 } from "lucide-react";

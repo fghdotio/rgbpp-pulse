@@ -257,7 +257,7 @@ function UdtRow({ asset, showDivider }: { asset: UdtAsset; showDivider: boolean 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{asset.symbol || asset.name}</div>
           <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {asset.location === 'btc' ? 'RGB++' : 'CKB'}
+            {asset.location === 'btc' ? 'BTC' : 'CKB'}
           </div>
         </div>
 

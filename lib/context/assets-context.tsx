@@ -71,7 +71,7 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
 
     // ── UDT fetch (independent) ──────────────────────
     setUdtLoading(true);
-    fetchUdtAssets(btcAddress, client, signer)
+    fetchUdtAssets(btcAddress, undefined, undefined)
       .then((udts) => {
         if (!cancelled) setUdtAssets(udts);
       })
@@ -88,7 +88,7 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     // ── Spore fetch (independent, with DOB enrichment phase 2) ──
     if (btcAddress) {
       setSporeLoading(true);
-      fetchSporeAssets(btcAddress, client, signer)
+      fetchSporeAssets(btcAddress, undefined, undefined)
         .then(async (spores) => {
           if (cancelled) return;
           setSporeAssets(spores);
