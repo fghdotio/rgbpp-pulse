@@ -6,13 +6,17 @@
  *
  * Uses @ckb-ccc/dob-render to compose the final SVG from decoded traits.
  *
- * API: https://dob-decoder-test.ckbccc.com/
+ * API: https://dob-decoder.ckbccc.com/ (mainnet)
+ *      https://dob-decoder-test.ckbccc.com/ (testnet)
  * Methods: dob_decode, dob_batch_decode
  */
 
 import { config as dobRenderConfig, renderByDobDecodeResponse } from '@ckb-ccc/dob-render';
+import { IS_MAINNET } from '@/lib/services/network';
 
-const DOB_DECODER_URL = 'https://dob-decoder-test.ckbccc.com/';
+const DOB_DECODER_URL = IS_MAINNET
+  ? 'https://dob-decoder.ckbccc.com/'
+  : 'https://dob-decoder-test.ckbccc.com/';
 
 // Configure dob-render to use our decoder server
 dobRenderConfig.setDobDecodeServerURL(DOB_DECODER_URL);

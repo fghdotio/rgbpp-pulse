@@ -5,8 +5,12 @@
  * RGB++ transactions, enabling recovery after page refresh.
  */
 import type { LeapToBtcCheckpoint } from './types';
+import { networkedKey } from './network';
 
-const CHECKPOINT_PREFIX = 'rgbpp_checkpoint_';
+// Per-network: a testnet pipelineId could theoretically collide with a
+// mainnet one, and recovering a testnet checkpoint into a mainnet session
+// would point at the wrong scripts/UTXOs.
+const CHECKPOINT_PREFIX = `${networkedKey('rgbpp_checkpoint')}:`;
 const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**

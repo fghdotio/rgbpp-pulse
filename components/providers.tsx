@@ -1,11 +1,28 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { ccc } from "@ckb-ccc/connector-react";
 import { AppProvider } from "@/lib/context/app-context";
 import { AssetsProvider } from "@/lib/context/assets-context";
 import { PipelineProvider } from "@/lib/context/pipeline-context";
 import { useTransactionRecovery } from "@/lib/hooks/useTransactionRecovery";
+import { isRgbppCapableWallet } from "@/lib/services/wallet-compat";
+import { IS_MAINNET, CKB_ADDRESS_PREFIX, BTC_NETWORK_NAME } from "@/lib/services/network";
+
+/**
+ * Only surface wallets whose BTC signer can actually sign + broadcast RGB++
+ * PSBTs. Filters out non-BTC signers and BTC signers that are stubs
+ * (e.g. UTXO Global). See lib/services/wallet-compat.ts.
+ */
+async function rgbppSignerFilter(
+  signerInfo: ccc.SignerInfo,
+  wallet: ccc.Wallet,
+): Promise<boolean> {
+  return (
+    signerInfo.signer.type === ccc.SignerType.BTC &&
+    isRgbppCapableWallet(wallet.name)
+  );
+}
 
 /**
  * Runs the transaction recovery hook on mount.
@@ -17,8 +34,30 @@ function TransactionRecoveryInitializer({ children }: { children: ReactNode }) {
 }
 
 export function Providers({ children }: { children: ReactNode }) {
+  const defaultClient = useMemo(
+    () => (IS_MAINNET ? new ccc.ClientPublicMainnet() : new ccc.ClientPublicTestnet()),
+    [],
+  );
+
+  // Push the connected BTC wallet onto the network matching our target.
+  // Keyed by CKB addressPrefix because ccc matches prefs against client.addressPrefix.
+  const preferredNetworks = useMemo<ccc.NetworkPreference[]>(
+    () => [
+      {
+        addressPrefix: CKB_ADDRESS_PREFIX,
+        signerType: ccc.SignerType.BTC,
+        network: BTC_NETWORK_NAME,
+      },
+    ],
+    [],
+  );
+
   return (
-    <ccc.Provider>
+    <ccc.Provider
+      defaultClient={defaultClient}
+      preferredNetworks={preferredNetworks}
+      signerFilter={rgbppSignerFilter}
+    >
       <AppProvider>
         <AssetsProvider>
           <PipelineProvider>

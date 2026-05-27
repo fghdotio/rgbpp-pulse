@@ -4,6 +4,8 @@ import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-r
 import { useApp } from "@/lib/context/app-context";
 import { truncateAddress } from "@/lib/utils";
 import { useState, useCallback, useRef, useEffect } from "react";
+import { NetworkSwitcher } from "@/components/network-switcher";
+import { IS_MAINNET } from "@/lib/services/network";
 
 export function Header() {
   const { isConnected, walletAddress, btcAddress, openConnector, disconnect } = useApp();
@@ -29,11 +31,11 @@ export function Header() {
   }, []);
 
   const ckbExplorerUrl = walletAddress
-    ? `https://pudge.explorer.nervos.org/address/${walletAddress}`
+    ? `https://${IS_MAINNET ? '' : 'pudge.'}explorer.nervos.org/address/${walletAddress}`
     : undefined;
 
   const btcExplorerUrl = btcAddress
-    ? `https://mempool.space/testnet/address/${btcAddress}`
+    ? `https://mempool.space${IS_MAINNET ? '' : '/testnet'}/address/${btcAddress}`
     : undefined;
 
   return (
@@ -43,6 +45,8 @@ export function Header() {
 
       {/* Right Side Actions */}
       <div className="flex items-center gap-3">
+
+        <NetworkSwitcher />
 
         {/* Wallet Connection */}
         {isConnected ? (

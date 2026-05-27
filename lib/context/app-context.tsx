@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { ccc } from '@ckb-ccc/connector-react';
+import { NETWORK, NETWORK_LABEL, btcNetworkOfAddress } from '@/lib/services/network';
 
 interface Notification {
   id: string;
@@ -95,6 +96,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const dismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
+
+  // Warn (don't silently follow) when the wallet is on a different BTC network
+  // than the app targets — avoids accidentally operating on real mainnet funds.
+  useEffect(() => {
+    if (!btcAddress) return;
+    const walletNet = btcNetworkOfAddress(btcAddress);
+    if (walletNet !== 'unknown' && walletNet !== NETWORK) {
+      const walletLabel = walletNet === 'mainnet' ? 'Bitcoin Mainnet' : 'Bitcoin Testnet';
+      notify(
+        'warn',
+        'Wrong wallet network',
+        `This app runs on ${NETWORK_LABEL}, but your wallet is on ${walletLabel}. Switch your wallet's network to continue.`,
+      );
+    }
+  }, [btcAddress, notify]);
 
   return (
     <AppContext.Provider

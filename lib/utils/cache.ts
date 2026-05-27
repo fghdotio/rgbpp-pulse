@@ -4,9 +4,14 @@
  * - Reads from memory first (fast path)
  * - Falls back to localStorage on cache miss (survives page refresh)
  * - Writes to both on set
+ *
+ * The prefix is per-network so the init scan picks up only this network's
+ * entries; a mainnet asset response can never be served inside a testnet
+ * session and vice versa.
  */
+import { networkedKey } from '@/lib/services/network';
 
-const LS_PREFIX = 'rgbpp_cache:';
+const LS_PREFIX = `${networkedKey('rgbpp_cache')}:`;
 
 /** In-memory layer (avoids JSON.parse on every read) */
 const memoryCache = new Map<string, unknown>();

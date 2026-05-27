@@ -3,7 +3,7 @@
  *
  * Uses:
  * - CCC SDK client.findCellsByLock to discover CKB-native xUDT assets
- * - RGB++ API (api-testnet.rgbpp.com) to discover BTC-bound RGB++ assets
+ * - RGB++ assets API (via the local /api/rgbpp proxy) to discover BTC-bound RGB++ assets
  * Falls back to mock data on failure.
  */
 import { ccc } from '@ckb-ccc/connector-react';

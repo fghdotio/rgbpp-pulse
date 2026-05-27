@@ -1,11 +1,14 @@
 /**
  * RGB++ Assets API Client
  *
- * Connects to the RGB++ indexer at https://api-testnet.rgbpp.com
- * Ref: https://api-testnet.rgbpp.com/docs/static/index.html
+ * Calls go through the local server proxy (/api/rgbpp/...) rather than the
+ * upstream indexer directly, so the deployment server is the egress IP and
+ * the mainnet API token stays server-side. See app/api/rgbpp/[...path]/route.ts
+ * and lib/services/network.ts.
  */
+import { ASSETS_API_BASE } from './network';
 
-const BASE_URL = 'https://api-testnet.rgbpp.com';
+const BASE_URL = ASSETS_API_BASE;
 
 // ─── Types ──────────────────────────────────────────────────
 

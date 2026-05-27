@@ -9,8 +9,11 @@ import {
   type ReactNode,
 } from "react";
 import type { TransactionPipeline } from "@/lib/services/types";
+import { networkedKey } from "@/lib/services/network";
 
-const STORAGE_KEY = "rgbpp_transaction_pipelines";
+// Per-network so testnet pipelines can never be read back inside a mainnet
+// session after a switch (and vice versa).
+const STORAGE_KEY = networkedKey("rgbpp_transaction_pipelines");
 
 /**
  * Serialize pipelines to localStorage.

@@ -8,8 +8,7 @@
  * All factories return Promises and import modules on-demand.
  */
 import { ccc } from '@ckb-ccc/core';
-
-const BTC_ASSETS_API_URL = 'https://api-testnet.rgbpp.com';
+import { ASSETS_API_BASE, IS_MAINNET } from './network';
 
 /**
  * Lazily import the @ckb-ccc/rgbpp barrel.
@@ -20,11 +19,18 @@ function loadRgbppModule() {
 
 /**
  * Lazily create a BtcAssetsApi data source.
+ *
+ * `url` points at the local server proxy so calls egress from the deployment
+ * server, not the user's browser. `isMainnet: false` is intentional even on
+ * mainnet: it only controls whether the SDK *requires a client-side token*.
+ * We keep the token server-side and let the proxy inject the Authorization /
+ * Origin headers; BTC network correctness comes from the network config passed
+ * to buildNetworkConfig, not from this flag.
  */
 async function loadBtcDataSource() {
   const { BtcAssetsApi } = await loadRgbppModule();
   return new BtcAssetsApi({
-    url: BTC_ASSETS_API_URL,
+    url: ASSETS_API_BASE,
     isMainnet: false,
   });
 }
@@ -42,7 +48,9 @@ async function loadRgbppUdtClient(ckbClient: ccc.Client) {
  */
 async function loadBrowserBtcWallet(btcSigner: ccc.SignerBtc) {
   const { createRgbppBrowserBtcWallet, buildNetworkConfig, PredefinedNetwork } = await loadRgbppModule();
-  const networkConfig = buildNetworkConfig(PredefinedNetwork.BitcoinTestnet3);
+  const networkConfig = buildNetworkConfig(
+    IS_MAINNET ? PredefinedNetwork.BitcoinMainnet : PredefinedNetwork.BitcoinTestnet3,
+  );
   const dataSource = await loadBtcDataSource();
   return createRgbppBrowserBtcWallet(btcSigner, networkConfig, dataSource);
 }
