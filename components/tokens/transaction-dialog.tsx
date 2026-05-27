@@ -30,7 +30,7 @@ import {
   udtLeapToBtc,
   udtTransferOnBtc,
   udtLeapToCkb,
-} from "@/src/services/rgbpp";
+} from "@/lib/services/rgbpp";
 
 export type TxDialogOperation = "leap-to-btc" | "transfer-on-btc" | "leap-to-ckb";
 

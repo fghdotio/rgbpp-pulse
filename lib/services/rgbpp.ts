@@ -113,48 +113,16 @@ function failStep(
 }
 
 /**
- * Simulate progressing through pipeline steps with delays.
- * Used as fallback when signer/client are not provided.
+ * Reject a pipeline upfront when its preconditions aren't met (no signer, no
+ * client, or signer is the wrong type). The pipeline is marked failed at
+ * step 0 with a clear message so the UI doesn't silently spin.
  */
-async function simulatePipeline(
+function rejectPipeline(
   pipeline: TransactionPipeline,
+  reason: string,
   onUpdate: (p: TransactionPipeline) => void,
-): Promise<TransactionPipeline> {
-  const steps = [...pipeline.steps];
-
-  for (let i = 0; i < steps.length; i++) {
-    steps[i] = { ...steps[i], status: 'active', timestamp: Date.now() };
-    pipeline = { ...pipeline, steps: [...steps] };
-    onUpdate(pipeline);
-
-    // Simulate work
-    await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000));
-
-    const mockHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-    steps[i] = {
-      ...steps[i],
-      status: 'done',
-      timestamp: Date.now(),
-      txHash: mockHash,
-      chain: steps[i].label.toLowerCase().includes('btc') ? 'btc' : 'ckb',
-    };
-    pipeline = { ...pipeline, steps: [...steps] };
-    onUpdate(pipeline);
-
-    // Activate next step
-    if (i + 1 < steps.length) {
-      steps[i + 1] = { ...steps[i + 1], status: 'active' };
-    }
-  }
-
-  pipeline = {
-    ...pipeline,
-    status: 'completed',
-    completedAt: Date.now(),
-    steps: [...steps],
-  };
-  onUpdate(pipeline);
-  return pipeline;
+): TransactionPipeline {
+  return failStep(pipeline, 0, reason, onUpdate);
 }
 
 // ─── UDT Operations ─────────────────────────────────────────
@@ -171,8 +139,6 @@ async function simulatePipeline(
  * 6. signer.signTransaction(tx)             — sign CKB tx
  * 7. client.sendTransaction(signedTx)       — broadcast CKB tx
  * 8. client.waitTransaction(txHash)         — wait for CKB confirmation
- *
- * Falls back to simulation if signer/client are not provided.
  */
 export async function udtLeapToBtc(
   params: UdtLeapToBtcParams,
@@ -192,16 +158,12 @@ export async function udtLeapToBtc(
   ]);
   onUpdate(pipeline);
 
-  // Fallback to simulation if no signer/client
   if (!signer || !client) {
-    console.warn('[udtLeapToBtc] No signer/client provided, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'No signer or client available — connect a wallet first.', onUpdate);
   }
 
-  // Verify the signer is a BTC signer
   if (!isBtcSigner(signer)) {
-    console.warn('[udtLeapToBtc] Signer is not a BTC signer, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'Connected wallet is not a BTC signer. RGB++ operations require a BTC wallet.', onUpdate);
   }
 
   try {
@@ -703,8 +665,6 @@ export async function resumeUdtLeapToCkb(
  * 6. Sign RGB++ CKB tx (unlock signer + user signer)
  * 7. Broadcast CKB tx
  * 8. Wait for CKB confirmation
- *
- * Falls back to simulation if signer/client are not provided.
  */
 export async function udtTransferOnBtc(
   params: UdtTransferOnBtcParams,
@@ -724,15 +684,12 @@ export async function udtTransferOnBtc(
   ]);
   onUpdate(pipeline);
 
-  // Fallback to simulation if no signer/client
   if (!signer || !client) {
-    console.warn('[udtTransferOnBtc] No signer/client provided, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'No signer or client available — connect a wallet first.', onUpdate);
   }
 
   if (!isBtcSigner(signer)) {
-    console.warn('[udtTransferOnBtc] Signer is not a BTC signer, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'Connected wallet is not a BTC signer. RGB++ operations require a BTC wallet.', onUpdate);
   }
 
   try {
@@ -873,8 +830,6 @@ export async function udtTransferOnBtc(
  * 7. Sign RGB++ CKB tx (unlock signer + user signer)
  * 8. Broadcast CKB tx
  * 9. Wait for CKB confirmation
- *
- * Falls back to simulation if signer/client are not provided.
  */
 export async function udtLeapToCkb(
   params: UdtLeapToCkbParams,
@@ -895,15 +850,12 @@ export async function udtLeapToCkb(
   ]);
   onUpdate(pipeline);
 
-  // Fallback to simulation if no signer/client
   if (!signer || !client) {
-    console.warn('[udtLeapToCkb] No signer/client provided, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'No signer or client available — connect a wallet first.', onUpdate);
   }
 
   if (!isBtcSigner(signer)) {
-    console.warn('[udtLeapToCkb] Signer is not a BTC signer, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'Connected wallet is not a BTC signer. RGB++ operations require a BTC wallet.', onUpdate);
   }
 
   try {
@@ -1064,8 +1016,6 @@ async function loadSporeModule() {
  * 7. signer.signTransaction(tx)             — sign CKB tx
  * 8. client.sendTransaction(signedTx)       — broadcast CKB tx
  * 9. client.waitTransaction(txHash)         — wait for CKB confirmation
- *
- * Falls back to simulation if signer/client are not provided.
  */
 export async function sporeLeapToBtc(
   params: SporeLeapToBtcParams,
@@ -1086,15 +1036,12 @@ export async function sporeLeapToBtc(
   ]);
   onUpdate(pipeline);
 
-  // Fallback to simulation if no signer/client
   if (!signer || !client) {
-    console.warn('[sporeLeapToBtc] No signer/client provided, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'No signer or client available — connect a wallet first.', onUpdate);
   }
 
   if (!isBtcSigner(signer)) {
-    console.warn('[sporeLeapToBtc] Signer is not a BTC signer, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'Connected wallet is not a BTC signer. RGB++ operations require a BTC wallet.', onUpdate);
   }
 
   try {
@@ -1221,8 +1168,6 @@ export async function sporeLeapToBtc(
  * 6. Sign RGB++ CKB tx (unlock signer + user signer)
  * 7. Broadcast CKB tx
  * 8. Wait for CKB confirmation
- *
- * Falls back to simulation if signer/client are not provided.
  */
 export async function sporeTransferOnBtc(
   params: SporeTransferOnBtcParams,
@@ -1241,15 +1186,12 @@ export async function sporeTransferOnBtc(
   ]);
   onUpdate(pipeline);
 
-  // Fallback to simulation if no signer/client
   if (!signer || !client) {
-    console.warn('[sporeTransferOnBtc] No signer/client provided, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'No signer or client available — connect a wallet first.', onUpdate);
   }
 
   if (!isBtcSigner(signer)) {
-    console.warn('[sporeTransferOnBtc] Signer is not a BTC signer, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'Connected wallet is not a BTC signer. RGB++ operations require a BTC wallet.', onUpdate);
   }
 
   try {
@@ -1376,8 +1318,6 @@ export async function sporeTransferOnBtc(
  * 6. Sign RGB++ CKB tx (unlock signer + user signer)
  * 7. Broadcast CKB tx
  * 8. Wait for CKB confirmation
- *
- * Falls back to simulation if signer/client are not provided.
  */
 export async function sporeLeapToCkb(
   params: SporeLeapToCkbParams,
@@ -1397,15 +1337,12 @@ export async function sporeLeapToCkb(
   ]);
   onUpdate(pipeline);
 
-  // Fallback to simulation if no signer/client
   if (!signer || !client) {
-    console.warn('[sporeLeapToCkb] No signer/client provided, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'No signer or client available — connect a wallet first.', onUpdate);
   }
 
   if (!isBtcSigner(signer)) {
-    console.warn('[sporeLeapToCkb] Signer is not a BTC signer, falling back to simulation');
-    return simulatePipeline(pipeline, onUpdate);
+    return rejectPipeline(pipeline, 'Connected wallet is not a BTC signer. RGB++ operations require a BTC wallet.', onUpdate);
   }
 
   try {

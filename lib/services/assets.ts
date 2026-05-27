@@ -4,7 +4,10 @@
  * Uses:
  * - CCC SDK client.findCellsByLock to discover CKB-native xUDT assets
  * - RGB++ assets API (via the local /api/rgbpp proxy) to discover BTC-bound RGB++ assets
- * Falls back to mock data on failure.
+ *
+ * Returns an empty list when both sources yield nothing. Callers MUST treat
+ * empty as "nothing found", not "we have a problem" — networks really can
+ * have addresses with no holdings.
  */
 import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
@@ -247,7 +250,8 @@ export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[
 
 /**
  * Fetch all UDT assets (CKB-native + RGB++-bound).
- * Falls back to mock data when both sources fail.
+ * Returns an empty list when neither source yields anything — the address
+ * legitimately holds no UDTs.
  */
 export async function fetchUdtAssets(
   btcAddress: string | null,
@@ -266,11 +270,6 @@ export async function fetchUdtAssets(
   if (btcAddress) {
     const rgbppUdts = await fetchRgbppUdtAssets(btcAddress);
     results.push(...rgbppUdts);
-  }
-
-  // Fall back to mock data if nothing found
-  if (results.length === 0) {
-    return getMockUdtAssets();
   }
 
   return results;
@@ -686,51 +685,3 @@ function isSporeCell(cell: RgbppCell): boolean {
   if (!cell.cellOutput.type) return false;
   return KNOWN_SPORE_CODE_HASHES.includes(cell.cellOutput.type.codeHash);
 }
-
-
-
-// ─── Mock Data (Fallback) ───────────────────────────────────
-
-export function getMockUdtAssets(): UdtAsset[] {
-  return [
-    {
-      type: 'udt',
-      name: 'RGB++ Test Token',
-      symbol: 'RTT',
-      decimals: 8,
-      balance: BigInt('100000000000'),
-      typeScriptArgs: '0xe6fa637f763fd63732146015b0964fe88f16996846b3d0a164bf15c069ff008b',
-      typeScriptCodeHash: '0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb',
-      typeScriptHashType: 'type',
-      location: 'ckb',
-      isMock: true,
-    },
-    {
-      type: 'udt',
-      name: 'Stable Coin X',
-      symbol: 'SCX',
-      decimals: 6,
-      balance: BigInt('5000000000'),
-      typeScriptArgs: '0x8418c9699aa47ef02f45f021a6d1d44e4dfa503cf2fc1b002ff3c39e9f158080',
-      typeScriptCodeHash: '0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4',
-      typeScriptHashType: 'type',
-      location: 'btc',
-      isMock: true,
-    },
-    {
-      type: 'udt',
-      name: 'CKB Wrapped BTC',
-      symbol: 'cBTC',
-      decimals: 8,
-      balance: BigInt('50000000'),
-      typeScriptArgs: '0x1f460e3c8c280ac828ec58cfe3b4ee55dfa1241420229222f24a330b37d3a15f',
-      typeScriptCodeHash: '0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb',
-      typeScriptHashType: 'type',
-      location: 'ckb',
-      isMock: true,
-    },
-  ];
-}
-
-
-

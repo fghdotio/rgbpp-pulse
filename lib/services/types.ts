@@ -25,7 +25,6 @@ export interface UdtAsset {
   typeScriptCodeHash: string;
   typeScriptHashType: string;
   location: AssetLocation;
-  isMock?: boolean;
 }
 
 /** Spore asset representation */
@@ -38,7 +37,6 @@ export interface SporeAsset {
   clusterName?: string;
   location: AssetLocation;
   capacity?: string;
-  isMock?: boolean;
   dobTraits?: DobTrait[];
   dobContent?: Record<string, unknown>;
   dobDecoded?: boolean;

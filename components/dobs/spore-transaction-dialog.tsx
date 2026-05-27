@@ -30,7 +30,7 @@ import {
   sporeLeapToBtc,
   sporeTransferOnBtc,
   sporeLeapToCkb,
-} from "@/src/services/rgbpp";
+} from "@/lib/services/rgbpp";
 
 export type SporeDialogOperation = "leap-to-btc" | "transfer-on-btc" | "leap-to-ckb";
 
