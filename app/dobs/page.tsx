@@ -18,7 +18,7 @@ export default function DobsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">DOBs</h1>
-            <p className="text-muted-foreground">Your DOB collection across Bitcoin and CKB</p>
+            <p className="text-muted-foreground">Your RGB++ DOB collection across Bitcoin and CKB</p>
           </div>
           <RefreshButton />
         </div>

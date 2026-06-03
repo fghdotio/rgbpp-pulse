@@ -21,7 +21,7 @@ export default function TransactionsPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
+            <h1 className="text-2xl font-bold text-foreground">RGB++ Transactions</h1>
             <p className="text-muted-foreground">
               Your RGB++ transaction history
             </p>

@@ -9,8 +9,8 @@ export default function TokensPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Tokens</h1>
-            <p className="text-muted-foreground">Your UDT tokens across Bitcoin and CKB</p>
+            <h1 className="text-2xl font-bold text-foreground">UDT Tokens</h1>
+            <p className="text-muted-foreground">Your RGB++ UDT tokens across Bitcoin and CKB</p>
           </div>
           <RefreshButton />
         </div>

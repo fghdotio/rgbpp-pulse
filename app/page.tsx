@@ -9,8 +9,8 @@ export default function PortfolioPage() {
       <div className="flex flex-col gap-6">
         {/* Page Header */}
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Portfolio</h1>
-          <p className="text-muted-foreground">Overview of your RGB++ assets</p>
+          <h1 className="text-2xl font-bold text-foreground">RGB++ Portfolio</h1>
+          <p className="text-muted-foreground">Manage RGB++ assets across Bitcoin and CKB</p>
         </div>
 
         {/* Assets Overview */}

@@ -42,7 +42,14 @@ export function Sidebar() {
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border">
         <img src="/logo.svg" alt="LeapFi" className="size-8" />
         {!collapsed && (
-          <span className="font-semibold text-foreground">LeapFi</span>
+          <div className="min-w-0">
+            <span className="block font-semibold text-foreground leading-tight">
+              LeapFi
+            </span>
+            <span className="block text-xs text-muted-foreground leading-tight">
+              RGB++ Asset Manager
+            </span>
+          </div>
         )}
       </div>
 
