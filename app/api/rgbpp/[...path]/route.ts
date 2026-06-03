@@ -16,7 +16,7 @@
  *
  *   2. DUAL-NETWORK (preview/dev): set RGBPP_API_URL_MAINNET and
  *      RGBPP_API_URL_TESTNET (each with its own _TOKEN / _ORIGIN). The proxy
- *      picks per request based on the `rgbpp-pulse-network` cookie set by
+ *      picks per request based on the `leapfi-network` cookie set by
  *      the in-app switcher (lib/services/network.ts → setNetwork).
  *
  * If both shapes are present, dual-network wins.
@@ -37,7 +37,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 // Must match COOKIE_NAME in lib/services/network.ts.
-const COOKIE_NAME = 'rgbpp-pulse-network';
+const COOKIE_NAME = 'leapfi-network';
 
 type Network = 'mainnet' | 'testnet';
 

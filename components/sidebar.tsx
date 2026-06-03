@@ -40,9 +40,9 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border">
-        <img src="/logo.svg" alt="RGB++ Pulse" className="size-8" />
+        <img src="/logo.svg" alt="LeapFi" className="size-8" />
         {!collapsed && (
-          <span className="font-semibold text-foreground">RGB++ Pulse</span>
+          <span className="font-semibold text-foreground">LeapFi</span>
         )}
       </div>
 

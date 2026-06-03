@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RGB++ Pulse | Asset Manager",
+  title: "LeapFi | RGB++ Asset Manager",
   description: "Manage your RGB++ assets across CKB and Bitcoin networks",
 };
 

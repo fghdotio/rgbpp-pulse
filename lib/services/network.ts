@@ -29,12 +29,12 @@ const ENV_NETWORK: AppNetwork =
 export const ALLOW_SWITCH =
   process.env.NEXT_PUBLIC_ALLOW_NETWORK_SWITCH === 'true';
 
-const LS_KEY = 'rgbpp-pulse:network';
+const LS_KEY = 'leapfi:network';
 /**
  * Cookie name read by the /api/rgbpp proxy to route requests to the correct
  * upstream. Must match COOKIE_NAME in app/api/rgbpp/[...path]/route.ts.
  */
-const COOKIE_NAME = 'rgbpp-pulse-network';
+const COOKIE_NAME = 'leapfi-network';
 
 function writeNetworkCookie(network: AppNetwork) {
   document.cookie = `${COOKIE_NAME}=${network}; path=/; max-age=31536000; SameSite=Lax`;

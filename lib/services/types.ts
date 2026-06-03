@@ -1,5 +1,5 @@
 /* ============================================================
-   Type Definitions for RGB++ Pulse
+   Type Definitions for LeapFi
    ============================================================ */
 
 /** Supported operations on RGB++ assets */
