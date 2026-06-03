@@ -36,6 +36,10 @@ const LS_KEY = 'rgbpp-pulse:network';
  */
 const COOKIE_NAME = 'rgbpp-pulse-network';
 
+function writeNetworkCookie(network: AppNetwork) {
+  document.cookie = `${COOKIE_NAME}=${network}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
 function readOverride(): AppNetwork | null {
   if (typeof window === 'undefined' || !ALLOW_SWITCH) return null;
   try {
@@ -83,8 +87,17 @@ export function setNetwork(next: AppNetwork) {
     return;
   }
   // 1 year, lax — same-origin only, sent on all /api/rgbpp/* requests.
-  document.cookie = `${COOKIE_NAME}=${next}; path=/; max-age=31536000; SameSite=Lax`;
+  writeNetworkCookie(next);
   window.location.reload();
+}
+
+/**
+ * Keep the server-visible cookie aligned with the client-selected network on
+ * initial boot. This covers first visits (no cookie yet) and stale-cookie cases.
+ */
+export function syncNetworkCookie() {
+  if (typeof document === 'undefined' || !ALLOW_SWITCH) return;
+  writeNetworkCookie(NETWORK);
 }
 
 /** CKB address prefix for the target network (ccc matches network prefs against this). */

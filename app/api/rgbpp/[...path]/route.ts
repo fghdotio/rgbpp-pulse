@@ -47,6 +47,9 @@ interface UpstreamConfig {
   origin?: string;
 }
 
+const ENV_NETWORK: Network =
+  process.env.NEXT_PUBLIC_NETWORK === 'mainnet' ? 'mainnet' : 'testnet';
+
 /**
  * Resolve env into per-network configs. Returns null for a network that has
  * no config (so callers can 400 instead of silently routing to the wrong
@@ -80,33 +83,37 @@ function loadConfigs(): { mainnet: UpstreamConfig | null; testnet: UpstreamConfi
   // Legacy single-network shape. Bind it to whichever network this deployment
   // claims to be — the env-var name was network-agnostic so we trust
   // NEXT_PUBLIC_NETWORK (server can read this too).
-  const pinnedNetwork: Network =
-    process.env.NEXT_PUBLIC_NETWORK === 'mainnet' ? 'mainnet' : 'testnet';
   const cfg: UpstreamConfig = {
     url: legacyUrl ?? 'https://api-testnet.rgbpp.com',
     token: process.env.RGBPP_API_TOKEN,
     origin: process.env.RGBPP_API_ORIGIN,
   };
   return {
-    mainnet: pinnedNetwork === 'mainnet' ? cfg : null,
-    testnet: pinnedNetwork === 'testnet' ? cfg : null,
+    mainnet: ENV_NETWORK === 'mainnet' ? cfg : null,
+    testnet: ENV_NETWORK === 'testnet' ? cfg : null,
   };
 }
 
 const CONFIGS = loadConfigs();
 
 /**
- * Pick the upstream for this request. Cookie wins when present and valid;
- * otherwise we fall back to whichever network this deployment serves.
+ * Pick the upstream for this request. Cookie wins when present and configured;
+ * otherwise fall back to NEXT_PUBLIC_NETWORK. This keeps the first visit to a
+ * dual-network preview aligned with the UI before the client has written its
+ * cookie, and prevents stale cookies from breaking single-network deploys.
  */
 function pickConfig(request: NextRequest): { network: Network; config: UpstreamConfig } | { error: string } {
   const cookie = request.cookies.get(COOKIE_NAME)?.value;
+  const cookieNetwork: Network | null =
+    cookie === 'mainnet' || cookie === 'testnet' ? cookie : null;
   const requested: Network =
-    cookie === 'mainnet' || cookie === 'testnet'
-      ? cookie
-      : CONFIGS.mainnet
-        ? 'mainnet'
-        : 'testnet';
+    cookieNetwork && CONFIGS[cookieNetwork]
+      ? cookieNetwork
+      : CONFIGS[ENV_NETWORK]
+        ? ENV_NETWORK
+        : CONFIGS.mainnet
+          ? 'mainnet'
+          : 'testnet';
 
   const config = CONFIGS[requested];
   if (!config) {

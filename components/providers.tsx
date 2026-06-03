@@ -1,13 +1,18 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, type ReactNode } from "react";
 import { ccc } from "@ckb-ccc/connector-react";
 import { AppProvider } from "@/lib/context/app-context";
 import { AssetsProvider } from "@/lib/context/assets-context";
 import { PipelineProvider } from "@/lib/context/pipeline-context";
 import { useTransactionRecovery } from "@/lib/hooks/useTransactionRecovery";
 import { isRgbppCapableWallet } from "@/lib/services/wallet-compat";
-import { IS_MAINNET, CKB_ADDRESS_PREFIX, BTC_NETWORK_NAME } from "@/lib/services/network";
+import {
+  IS_MAINNET,
+  CKB_ADDRESS_PREFIX,
+  BTC_NETWORK_NAME,
+  syncNetworkCookie,
+} from "@/lib/services/network";
 
 /**
  * Only surface wallets whose BTC signer can actually sign + broadcast RGB++
@@ -34,6 +39,10 @@ function TransactionRecoveryInitializer({ children }: { children: ReactNode }) {
 }
 
 export function Providers({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => {
+    syncNetworkCookie();
+  }, []);
+
   const defaultClient = useMemo(
     () => (IS_MAINNET ? new ccc.ClientPublicMainnet() : new ccc.ClientPublicTestnet()),
     [],
