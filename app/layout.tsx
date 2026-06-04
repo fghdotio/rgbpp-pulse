@@ -14,12 +14,34 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://leapfi-preview.netlify.app",
+  ),
   title: "LeapFi | RGB++ Asset Manager",
   description: "Manage your RGB++ assets across CKB and Bitcoin networks",
+  applicationName: "LeapFi",
+  manifest: "/site.webmanifest",
+  openGraph: {
+    type: "website",
+    siteName: "LeapFi",
+    url: "/",
+    title: "LeapFi | RGB++ Asset Manager",
+    description:
+      "Non-custodial RGB++ asset manager. Leap UDT & Spore assets across Bitcoin and CKB.",
+    images: [
+      { url: "/og-image.png", width: 1200, height: 630, alt: "LeapFi — RGB++ Asset Manager" },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LeapFi | RGB++ Asset Manager",
+    description: "Non-custodial RGB++ asset manager. Leap assets across Bitcoin and CKB.",
+    images: ["/og-image.png"],
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d0d12",
+  themeColor: "#05070B",
   width: "device-width",
   initialScale: 1,
 };

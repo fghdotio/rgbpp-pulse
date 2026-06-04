@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#ECF0F5"/></linearGradient>
+    <radialGradient id="gl1" cx="0.26" cy="0.22" r="0.55"><stop offset="0" stop-color="#00C66D" stop-opacity="0.12"/><stop offset="1" stop-color="#00C66D" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gl2" cx="0.9" cy="0.95" r="0.5"><stop offset="0" stop-color="#F7931A" stop-opacity="0.10"/><stop offset="1" stop-color="#F7931A" stop-opacity="0"/></radialGradient>
+    <linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E7EBF1"/></linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00B765"/><stop offset="1" stop-color="#008F4E"/></linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/><rect width="1200" height="630" fill="url(#gl1)"/><rect width="1200" height="630" fill="url(#gl2)"/>
+  <rect x="96" y="180" width="180" height="180" rx="42" fill="url(#t)"/>
+  <rect x="97" y="181" width="178" height="178" rx="41" fill="none" stroke="#0B0E13" stroke-opacity="0.08" stroke-width="2"/>
+  <svg x="116" y="214" width="140" height="140" viewBox="5.5 4.5 46 46">
+    <path d="M13 18 C 12.2 27 12 33.5 16.8 36.2 C 21.5 38.4 32 37.6 43.7 37.2" fill="none" stroke="url(#g)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="29" cy="21" r="6.4" fill="#F7931A"/>
+  </svg>
+  <text x="312" y="262" font-family="'Arial Rounded MT Bold', ui-rounded, sans-serif" font-size="96" font-weight="700" fill="#0B0E13">Leap<tspan fill="#00A85C">Fi</tspan></text>
+  <text x="316" y="318" font-family="'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="600" fill="#55606E">Non-custodial RGB++ Asset Manager</text>
+  <g font-family="'Helvetica Neue', Arial, sans-serif">
+    <circle cx="326" cy="404" r="9" fill="#F7931A"/><text x="346" y="412" font-size="24" font-weight="600" fill="#3A4250">Bitcoin</text>
+    <path d="M454 404 C 484 384 514 384 542 404" stroke="#00A85C" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M534 397 L543 403.5 L537 412.5" stroke="#00A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="562" cy="404" r="9" fill="#00A85C"/><text x="582" y="412" font-size="24" font-weight="600" fill="#3A4250">CKB</text>
+  </g>
+  <text x="96" y="566" font-family="'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="500" fill="#8A93A0">leapfi.app</text>
+</svg>

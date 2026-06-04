@@ -43,8 +43,11 @@ export function Sidebar() {
         <img src="/logo.svg" alt="LeapFi" className="size-8" />
         {!collapsed && (
           <div className="min-w-0">
-            <span className="block font-semibold text-foreground leading-tight">
-              LeapFi
+            <span
+              className="block font-bold tracking-tight text-foreground leading-tight"
+              style={{ fontFamily: "'Arial Rounded MT Bold', ui-rounded, system-ui, sans-serif" }}
+            >
+              Leap<span className="text-primary">Fi</span>
             </span>
             <span className="block text-xs text-muted-foreground leading-tight">
               RGB++ Asset Manager
