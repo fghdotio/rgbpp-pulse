@@ -1,9 +1,10 @@
 /**
  * Asset Discovery Service
  *
- * Uses:
- * - CCC SDK client.findCellsByLock to discover CKB-native xUDT assets
- * - RGB++ assets API (via the local /api/rgbpp proxy) to discover BTC-bound RGB++ assets
+ * Two sources, one per side of the bridge:
+ * - CCC SDK client.findCells for CKB-native assets
+ * - the RGB++ indexer for BTC-bound assets, enriched with names and decimals
+ *   from the asset-metadata provider
  *
  * Returns an empty list when both sources yield nothing. Callers MUST treat
  * empty as "nothing found", not "we have a problem" — networks really can
@@ -11,7 +12,8 @@
  */
 import { ccc } from '@ckb-ccc/connector-react';
 import type { UdtAsset, SporeAsset } from './types';
-import { getAddressAssets, getAssetTypeInfo, type RgbppCell } from './api';
+import { assetMetadata, indexer } from './providers';
+import type { CkbScript, RgbppCell } from './providers';
 import { batchDecodeDobs, renderDobToSvg } from './dob';
 import { cacheGet, cacheSet } from '@/lib/utils/cache';
 
@@ -117,20 +119,20 @@ export async function fetchCkbUdtAssets(
       let symbol = info.typeScriptArgs.slice(2, 8).toUpperCase();
       let decimals = 8;
 
-      // Try to look up real token info from the RGB++ API
+      // Try to look up real token info from the metadata provider
       try {
-        const typeInfo = await getAssetTypeInfo({
+        const meta = await assetMetadata.getAssetMetadata({
           codeHash: info.typeScriptCodeHash,
           args: info.typeScriptArgs,
-          hashType: info.typeScriptHashType as 'type' | 'data' | 'data1' | 'data2',
+          hashType: info.typeScriptHashType as CkbScript['hashType'],
         });
-        if (typeInfo && 'symbol' in typeInfo) {
-          name = typeInfo.name || name;
-          symbol = typeInfo.symbol || symbol;
-          decimals = typeInfo.decimal ?? decimals;
+        if (meta?.type === 'xudt') {
+          name = meta.name || name;
+          symbol = meta.symbol || symbol;
+          decimals = meta.decimal ?? decimals;
         }
       } catch {
-        // API lookup failed, use defaults
+        // Metadata lookup failed, use defaults
       }
 
       assets.push({
@@ -154,52 +156,47 @@ export async function fetchCkbUdtAssets(
 }
 
 /**
- * Fetch RGB++-bound UDT balances from the RGB++ API via the /assets endpoint.
- * Filters out Spore cells, parses LE u128 amounts from cell data,
- * aggregates by type script args, and enriches with token metadata.
+ * A cell only counts as a holding while it is `live`.
+ *
+ * `pending_ckb` means the bound UTXO is already spent on Bitcoin and the CKB
+ * side has not caught up — the asset is in flight, and showing it as spendable
+ * invites the user to build a transaction against a cell that is already gone.
+ */
+function isHeld(cell: RgbppCell): boolean {
+  return cell.status === 'live';
+}
+
+/**
+ * Fetch RGB++-bound UDT balances from the indexer.
+ *
+ * The indexer classifies each cell and parses its UDT amount, so this only has
+ * to aggregate by type script and attach names and decimals from the metadata
+ * provider.
  */
 export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[]> {
   try {
-    const cells = await getAddressAssets(btcAddress);
+    const cells = await indexer.getAddressCells(btcAddress);
 
-    // Filter for xUDT cells (has type script, is NOT a Spore cell)
     const udtCells = cells.filter(
-      (cell) => cell.cellOutput.type && !isSporeCell(cell),
+      (cell) =>
+        isHeld(cell) &&
+        cell.typeScript !== null &&
+        (cell.assetKind === 'xudt' || cell.assetKind === 'sudt'),
     );
 
     // Aggregate balances by type script args
-    const balanceMap = new Map<string, {
-      balance: bigint;
-      typeScript: { codeHash: string; args: string; hashType: string };
-    }>();
+    const balanceMap = new Map<string, { balance: bigint; typeScript: CkbScript }>();
 
     for (const cell of udtCells) {
-      const typeScript = cell.cellOutput.type!;
+      const typeScript = cell.typeScript!;
       const key = typeScript.args;
-
-      // Parse LE u128 from first 16 bytes of cell data
-      let amount = BigInt(0);
-      const dataHex = (cell.data || '').startsWith('0x')
-        ? (cell.data || '').slice(2)
-        : (cell.data || '');
-      if (dataHex.length >= 32) {
-        const leBytes = dataHex.slice(0, 32);
-        const beBytes = leBytes.match(/.{2}/g)!.reverse().join('');
-        amount = BigInt('0x' + beBytes);
-      }
+      const amount = cell.amount ?? BigInt(0);
 
       const existing = balanceMap.get(key);
       if (existing) {
         existing.balance += amount;
       } else {
-        balanceMap.set(key, {
-          balance: amount,
-          typeScript: {
-            codeHash: typeScript.codeHash,
-            args: typeScript.args,
-            hashType: typeScript.hashType,
-          },
-        });
+        balanceMap.set(key, { balance: amount, typeScript });
       }
     }
 
@@ -214,18 +211,14 @@ export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[
       let decimals = 8;
 
       try {
-        const typeInfo = await getAssetTypeInfo({
-          codeHash: info.typeScript.codeHash,
-          args: info.typeScript.args,
-          hashType: info.typeScript.hashType as 'type' | 'data' | 'data1' | 'data2',
-        });
-        if (typeInfo && 'symbol' in typeInfo) {
-          name = typeInfo.name || name;
-          symbol = typeInfo.symbol || symbol;
-          decimals = typeInfo.decimal ?? decimals;
+        const meta = await assetMetadata.getAssetMetadata(info.typeScript);
+        if (meta?.type === 'xudt') {
+          name = meta.name || name;
+          symbol = meta.symbol || symbol;
+          decimals = meta.decimal ?? decimals;
         }
       } catch {
-        // API lookup failed, use defaults
+        // Metadata lookup failed, use defaults
       }
 
       assets.push({
@@ -243,7 +236,7 @@ export async function fetchRgbppUdtAssets(btcAddress: string): Promise<UdtAsset[
 
     return assets;
   } catch (err) {
-    console.warn('Failed to fetch RGB++ UDT assets from API:', err);
+    console.warn('Failed to fetch RGB++ UDT assets from the indexer:', err);
     return [];
   }
 }
@@ -552,33 +545,39 @@ export async function* generateCkbSporeAssets(
 }
 
 /**
- * Fetch RGB++-bound Spore assets from the RGB++ API.
+ * Fetch RGB++-bound Spore assets from the indexer.
+ *
+ * Cluster name and content type come from the metadata provider; the cell's own
+ * data is the fallback, and it always yields the content type even when the
+ * provider knows nothing about the spore.
  */
 export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAsset[]> {
   try {
-    const cells = await getAddressAssets(btcAddress);
-    const sporeCells = cells.filter((cell) => isSporeCell(cell));
+    const cells = await indexer.getAddressCells(btcAddress);
+    const sporeCells = cells.filter(
+      (cell) => isHeld(cell) && cell.assetKind === 'spore' && cell.typeScript,
+    );
 
     const spores: SporeAsset[] = [];
     for (const cell of sporeCells) {
-      const typeScript = cell.cellOutput.type;
-      if (!typeScript) continue;
+      const typeScript = cell.typeScript!;
+      const parsed = parseSporeData(cell.data);
 
+      let contentType = parsed.contentType;
+      let clusterId = parsed.clusterId;
       let clusterName = '';
-      let clusterId = '';
-      let contentType = 'unknown';
 
       try {
-        const info = await getAssetTypeInfo(typeScript);
-        if (info && info.type === 'spore') {
-          contentType = info.contentType;
-          if (info.cluster) {
-            clusterId = info.cluster.id;
-            clusterName = info.cluster.name;
+        const meta = await assetMetadata.getAssetMetadata(typeScript);
+        if (meta?.type === 'spore') {
+          contentType = meta.contentType || contentType;
+          if (meta.cluster) {
+            clusterId = meta.cluster.id;
+            clusterName = meta.cluster.name;
           }
         }
       } catch {
-        contentType = parseSporeData(cell.data).contentType;
+        // Metadata lookup failed; the parsed cell data already stands in.
       }
 
       spores.push({
@@ -588,14 +587,14 @@ export async function fetchRgbppSporeAssets(btcAddress: string): Promise<SporeAs
         content: '',
         clusterId,
         clusterName,
-        capacity: cell.cellOutput.capacity,
+        capacity: cell.capacity.toString(),
         location: 'btc',
       });
     }
 
     return spores;
   } catch (err) {
-    console.warn('Failed to fetch RGB++ Spore assets from API:', err);
+    console.warn('Failed to fetch RGB++ Spore assets from the indexer:', err);
     return [];
   }
 }
@@ -679,9 +678,4 @@ export async function enrichSporesWithDob(spores: SporeAsset[]): Promise<SporeAs
   }
 
   return spores;
-}
-
-function isSporeCell(cell: RgbppCell): boolean {
-  if (!cell.cellOutput.type) return false;
-  return KNOWN_SPORE_CODE_HASHES.includes(cell.cellOutput.type.codeHash);
 }

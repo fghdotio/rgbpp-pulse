@@ -7,9 +7,18 @@ import { useApp } from "@/lib/context/app-context";
 import { useAssets } from "@/lib/context/assets-context";
 import { truncateAddress, formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
-import type { ActivityTransaction } from "@/lib/services/api";
+import {
+  activityConfirmed,
+  activityFee,
+  activityOperation,
+  activityTimestamp,
+  type ActivityOperation,
+} from "@/lib/services/activity";
 
-const typeConfig = {
+const typeConfig: Record<
+  ActivityOperation,
+  { icon: typeof ArrowUpRight; label: string; description: string; color: string }
+> = {
   "leap-to-btc": {
     icon: ArrowUpRight,
     label: "Leap to BTC",
@@ -28,31 +37,13 @@ const typeConfig = {
     description: "Crossed assets to CKB",
     color: "text-chart-2",
   },
-} as const;
-
-/**
- * Improved transaction type inference.
- * Analyzes isomorphic tx inputs/outputs to determine direction.
- */
-function inferTxType(tx: ActivityTransaction): keyof typeof typeConfig {
-  if (!tx.isRgbpp || !tx.isomorphicTx) return "transfer-on-btc";
-
-  const { inputs, outputs } = tx.isomorphicTx;
-
-  // If outputs have RGB++ lock but inputs don't → leap-to-btc
-  // If inputs have RGB++ lock but outputs don't → leap-to-ckb
-  // Otherwise → transfer-on-btc
-  const hasRgbppInput = inputs?.some(
-    (o) => o.lock?.codeHash?.startsWith("0x61ca7a4796a4eb19ca4f0d065cb9b10ddcf002f10f7cbb810c706cb6bb5c3248")
-  );
-  const hasRgbppOutput = outputs?.some(
-    (o) => o.lock?.codeHash?.startsWith("0x61ca7a4796a4eb19ca4f0d065cb9b10ddcf002f10f7cbb810c706cb6bb5c3248")
-  );
-
-  if (hasRgbppOutput && !hasRgbppInput) return "leap-to-btc";
-  if (hasRgbppInput && !hasRgbppOutput) return "leap-to-ckb";
-  return "transfer-on-btc";
-}
+  exit: {
+    icon: ArrowLeftRight,
+    label: "Left RGB++",
+    description: "Consumed RGB++ cells with no RGB++ output",
+    color: "text-muted-foreground",
+  },
+};
 
 export function RecentActivity() {
   const { isConnected } = useApp();
@@ -82,17 +73,16 @@ export function RecentActivity() {
         ) : (
           <div className="space-y-1">
             {recentActivity.slice(0, 5).map((activity, index) => {
-              const txType = inferTxType(activity);
-              const config = typeConfig[txType];
+              const config = typeConfig[activityOperation(activity)];
               const Icon = config.icon;
-              const isConfirmed = activity.btcTx.status.confirmed;
-              const timestamp = activity.btcTx.status.block_time
-                ? activity.btcTx.status.block_time * 1000
-                : Date.now();
+              const isConfirmed = activityConfirmed(activity);
+              const timestamp = activityTimestamp(activity) ?? Date.now();
+              const fee = activityFee(activity);
+              const btcTxid = activity.btc?.txid;
 
               return (
                 <div
-                  key={activity.btcTx.txid || index}
+                  key={activity.ckbTxHash || index}
                   className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent/50 transition-colors group"
                 >
                   <div className={`size-10 rounded-lg bg-secondary flex items-center justify-center`}>
@@ -107,23 +97,25 @@ export function RecentActivity() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {config.description}
-                      {activity.btcTx.fee > 0 && ` · Fee: ${activity.btcTx.fee} sat`}
+                      {fee !== null && fee > 0 && ` · Fee: ${fee} sat`}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs text-muted-foreground">
                       {formatRelativeTime(timestamp)}
                     </p>
-                    <a
-                      href={`https://mempool.space/testnet/tx/${activity.btcTx.txid}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {truncateAddress(activity.btcTx.txid, 4, 4)}
-                      <ExternalLink className="size-2.5" />
-                    </a>
+                    {btcTxid && (
+                      <a
+                        href={`https://mempool.space/testnet/tx/${btcTxid}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {truncateAddress(btcTxid, 4, 4)}
+                        <ExternalLink className="size-2.5" />
+                      </a>
+                    )}
                   </div>
                 </div>
               );

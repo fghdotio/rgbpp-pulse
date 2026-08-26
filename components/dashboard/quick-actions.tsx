@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useApp } from "@/lib/context/app-context";
 import { useEffect, useState, useCallback } from "react";
-import { getRecommendedFees, getBtcInfo } from "@/lib/services/api";
+import { gateway } from "@/lib/services/providers";
 
 interface NetworkInfo {
   btcFeeRate: number | null;
@@ -30,8 +30,8 @@ function useNetworkStatus() {
     setInfo((prev) => ({ ...prev, loading: true, error: false }));
     try {
       const [fees, btcInfo, ckbTipResult, ckbFeeResult] = await Promise.allSettled([
-        getRecommendedFees(),
-        getBtcInfo(),
+        gateway.getRecommendedFee(),
+        gateway.getChainInfo(),
         // CKB tip block via CCC client's getTip()
         client ? client.getTip() : Promise.resolve(null),
         // CKB fee rate via CCC client's getFeeRateStatistics()

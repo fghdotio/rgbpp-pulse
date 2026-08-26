@@ -14,7 +14,7 @@ import {
   fetchSporeAssets,
   enrichSporesWithDob,
 } from "@/lib/services/assets";
-import { getAddressActivity, type ActivityTransaction } from "@/lib/services/api";
+import { indexer, type ActivityEntry } from "@/lib/services/providers";
 import type { UdtAsset, SporeAsset } from "@/lib/services/types";
 
 interface AssetsContextValue {
@@ -23,7 +23,7 @@ interface AssetsContextValue {
   /** Spore/DOB assets */
   sporeAssets: SporeAsset[];
   /** Recent RGB++ transactions */
-  recentActivity: ActivityTransaction[];
+  recentActivity: ActivityEntry[];
   /** Whether UDT tokens are loading */
   udtLoading: boolean;
   /** Whether Spore/DOB assets are loading */
@@ -45,7 +45,7 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
 
   const [udtAssets, setUdtAssets] = useState<UdtAsset[]>([]);
   const [sporeAssets, setSporeAssets] = useState<SporeAsset[]>([]);
-  const [recentActivity, setRecentActivity] = useState<ActivityTransaction[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [udtLoading, setUdtLoading] = useState(false);
   const [sporeLoading, setSporeLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -118,9 +118,10 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     // ── Activity fetch (independent) ─────────────────
     if (btcAddress) {
       setActivityLoading(true);
-      getAddressActivity(btcAddress, { rgbppOnly: true })
+      indexer
+        .getAddressActivity(btcAddress, { limit: 10 })
         .then((r) => {
-          if (!cancelled) setRecentActivity(r.txs.slice(0, 10));
+          if (!cancelled) setRecentActivity(r.entries);
         })
         .catch(() => {
           if (!cancelled) setRecentActivity([]);

@@ -107,12 +107,19 @@ export const CKB_ADDRESS_PREFIX = IS_MAINNET ? 'ckb' : 'ckt';
 export const BTC_NETWORK_NAME = IS_MAINNET ? 'btc' : 'btcTestnet';
 
 /**
- * Browser-side base URL for the RGB++ assets API. Always the local server
- * proxy (see app/api/rgbpp/[...path]/route.ts), so the deployment server —
- * not the user's browser — is the egress IP, and the mainnet API token stays
- * server-side.
+ * Browser-side base URLs for the three data providers. Each is a local server
+ * proxy (see app/api/{indexer,gateway,metadata}/[...path]/route.ts), so the
+ * deployment server — not the user's browser — is the egress IP, and upstream
+ * tokens stay server-side.
+ *
+ * Three routes rather than one because the upstreams are three different
+ * services: rgbpp-indexer today, and rgbpp-gateway plus an asset-metadata
+ * service once they exist. Until then the last two are pointed at
+ * btc-assets-api by env; see lib/services/providers/types.ts.
  */
-export const ASSETS_API_BASE = '/api/rgbpp';
+export const INDEXER_API_BASE = '/api/indexer';
+export const GATEWAY_API_BASE = '/api/gateway';
+export const METADATA_API_BASE = '/api/metadata';
 
 /** Human label for warnings/notifications. */
 export const NETWORK_LABEL = IS_MAINNET ? 'Bitcoin Mainnet' : 'Bitcoin Testnet';
